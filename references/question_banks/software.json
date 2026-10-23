@@ -1,0 +1,1 @@
+{"slots":[{"id":"software_integration","importance":"high","question":"方案需要兼容哪些现有接口、系统和运行环境？","why_it_matters":"避免生成难以落地的架构"},{"id":"software_success","importance":"high","question":"你希望用什么可观察指标判断方案成功？","why_it_matters":"让筛选标准可验证"}]}

@@ -1,0 +1,8 @@
+{
+  "slots": [
+    {"id":"deliverable_interpretation","importance":"critical","question":"你说的交付数量和单位具体指什么？每个方案应包含哪些内容？","why_it_matters":"误读‘4组’为四张、四类或四套会改变最终产物"},
+    {"id":"desired_outcome","importance":"critical","question":"这次设计最希望用户或玩家获得什么样的体验或结果？","why_it_matters":"缺乏成功标准时，筛选容易偏向模型喜欢的新颖形式"},
+    {"id":"change_boundary","importance":"high","question":"哪些已有设计必须保留，哪些部分可以重新设计？","why_it_matters":"避免把参考资料误当不可变规则，或为随机性擅自重构"},
+    {"id":"evaluation_priority","importance":"optional","question":"当创新、实用性、成本和体验发生冲突时，哪项优先？","why_it_matters":"决定进入最后一轮的评分排序"}
+  ]
+}

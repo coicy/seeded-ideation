@@ -1,0 +1,22 @@
+{
+  "request":"为一款已有的自主居民聚落游戏设计20张新卡，至少8种独立定位；每张2–3种机制变体，可依据需要新增不超过7种地块属性，并优先让新卡与既有居民自主行动、生产与物流产生可观察的联动。",
+  "context":{"summary":"已有卡牌修改环境条件，居民自行选择合法动作；游戏存在食物、木材、石材生产与搬运。这里只是演示上下文，不是内置游戏规则。","references":["用实际项目文件与本次用户裁决核验"]},
+  "requirements":[
+    {"id":"C1","text":"20张新卡","level":"must","source":"user"},
+    {"id":"C2","text":"至少8种独立定位","level":"must","source":"user"},
+    {"id":"C3","text":"每张卡2-3种差异化变体","level":"must","source":"user"},
+    {"id":"C4","text":"最多7种新增地块属性（允许0到7，按设计必要性决定）","level":"must","source":"user"},
+    {"id":"C5","text":"尊重已确认的玩法，同时探索有意义的间接反馈","level":"prefer","source":"user"}
+  ],
+  "freedoms":[
+    {"id":"target","name":"目标选择与空间关联"},
+    {"id":"condition","name":"触发条件与适用对象"},
+    {"id":"consequence","name":"现有机制间的因果反馈"},
+    {"id":"timing","name":"卡牌时点与持续方式"},
+    {"id":"tradeoff","name":"环境机会成本与使用代价"},
+    {"id":"combination","name":"与已有卡牌及物流的组合"},
+    {"id":"information","name":"预测、提示与可观察结果"},
+    {"id":"extension","name":"用户许可的新地块属性与必要扩展"}
+  ],
+  "deliverables":{"items":20,"variants_min":2,"variants_max":3,"min_distinct_positions":8,"max_new_attributes":7}
+}

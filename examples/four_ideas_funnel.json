@@ -1,0 +1,16 @@
+{
+  "request": "提出四种真正不同且符合当前需求的产品设计方向；先广泛发散，再筛选。",
+  "requirements": [
+    {"id": "R1", "text": "每个方案必须解决指定用户问题，而不是只引入装饰变化。", "level": "must", "source": "user"},
+    {"id": "R2", "text": "每个方案必须可以说明基本使用流程和价值。", "level": "must", "source": "user"},
+    {"id": "P1", "text": "更偏好成本可控、便于小规模验证的方向。", "level": "prefer", "source": "inferred"}
+  ],
+  "freedoms": [
+    {"id": "f1", "name": "interaction", "description": "变化用户与系统的交互方法"},
+    {"id": "f2", "name": "timing", "description": "变化触发和时序安排"},
+    {"id": "f3", "name": "information", "description": "变化信息呈现和反馈结构"},
+    {"id": "f4", "name": "collaboration", "description": "变化各参与元素间的协作"}
+  ],
+  "deliverables": {"items": 4, "min_distinct_positions": 4},
+  "ideation": {"pool_size": 256, "batch_size": 32, "require_full_pool": true}
+}

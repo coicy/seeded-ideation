@@ -1,0 +1,83 @@
+{
+  "request": "为《神谕牌》设计四组卡牌（先前需求提过20张、每张2-3个变体、至少8种独立定位），重点关注涌现式策略，并保留相关正式规则",
+  "context": {
+    "summary": "最近用户请求“四组”，未澄清“四组”的交付单位；原有游戏规则可从正式资料读取",
+    "references": [
+      "《神谕牌》最新产品裁决；本示例不替代活动权威"
+    ]
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "应与《神谕牌》的核心玩法关联",
+      "level": "must",
+      "source": "user"
+    },
+    {
+      "id": "R2",
+      "text": "每张候选卡具有2-3个差异化变体",
+      "level": "must",
+      "source": "user"
+    },
+    {
+      "id": "R3",
+      "text": "新增地块属性不超过7种（0–7均允许）",
+      "level": "must",
+      "source": "user"
+    }
+  ],
+  "deliverables": {
+    "items": 20,
+    "variants_min": 2,
+    "variants_max": 3,
+    "min_distinct_positions": 8,
+    "max_new_attributes": 7
+  },
+  "ideation": {
+    "pool_size": 256,
+    "batch_size": 32
+  },
+  "elicitation": {
+    "domain": "cards",
+    "facts": {
+      "deliverable_interpretation": {
+        "status": "unknown"
+      },
+      "desired_outcome": {
+        "status": "confirmed",
+        "value": "通过环境、生产、物流和居民自主活动探索涌现",
+        "source": "user",
+        "evidence": "用户在本次对话明确提出“着重关注涌现式的设计方案”"
+      },
+      "change_boundary": {
+        "status": "inferred",
+        "value": "可能是基线下的扩展，而非重做整套游戏",
+        "evidence": "从已有项目延续性推断；用户未明确同意本轮修改范围"
+      },
+      "cards_role": {
+        "status": "unknown"
+      },
+      "cards_synergy": {
+        "status": "unknown"
+      },
+      "cards_variants": {
+        "status": "unknown"
+      },
+      "cards_power_budget": {
+        "status": "unknown"
+      },
+      "cards_theme": {
+        "status": "unknown"
+      }
+    },
+    "relevance": {
+      "deliverable_interpretation": "high",
+      "change_boundary": "high",
+      "cards_role": "high",
+      "cards_synergy": "high",
+      "cards_variants": "high",
+      "cards_power_budget": "low",
+      "cards_theme": "low"
+    }
+  }
+}

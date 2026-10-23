@@ -1,0 +1,9 @@
+{
+  "slots": [
+    {"id":"cards_role","importance":"high","question":"这些卡牌希望承担哪些核心玩法定位？哪些已有定位需要补足或避免重复？","why_it_matters":"‘八种定位’不能仅通过给八个概念起不同名字满足"},
+    {"id":"cards_synergy","importance":"high","question":"各张卡及各组之间应当独立可用，还是重点形成同组连携、跨组组合？","why_it_matters":"决定候选选择应优化单卡强度、组合策略还是整组风格"},
+    {"id":"cards_variants","importance":"high","question":"每张卡的 2–3 个变体是互斥设计备选、卡牌升级分支，还是实际可共存的独立卡？","why_it_matters":"对应不同交付数量、卡组占位和系统设计"},
+    {"id":"cards_power_budget","importance":"optional","question":"新卡牌的费用、强度与操作复杂度应对齐现有卡，还是允许引入更复杂、更强的效果？","why_it_matters":"关系到卡牌整体环境、节奏、平衡和原型投入"},
+    {"id":"cards_theme","importance":"optional","question":"卡牌是否需要统一的世界观、神力表达或视觉主题？","why_it_matters":"影响卡牌表达与玩家理解，但不应被无端升为硬约束"}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "request":"重新设计我们已经上线的企业知识搜索产品的信息架构和导航，不必沿用旧的栏目与交互方式；给出4种真正不同的方案。",
+  "context":{"summary":"旧版采用静态树状导航和简单全文搜索。它是问题背景，不是禁止修改的合同。"},
+  "requirements":[
+    {"id":"U1","text":"允许推翻旧信息架构和交互规则","level":"explore","source":"user"},
+    {"id":"U2","text":"给出4种设计方向","level":"must","source":"user"}
+  ],
+  "freedoms":[{"name":"导航组织"},{"name":"搜索交互"},{"name":"信息呈现"},{"name":"工作流整合"}],
+  "deliverables":{"items":4,"min_distinct_positions":4}
+}

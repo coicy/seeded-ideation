@@ -1,0 +1,10 @@
+{
+  "request":"为一部科幻小说写5种不同的宣传文案，每种80字以内，突出悬念，不剧透结局。",
+  "requirements":[
+    {"id":"W1","text":"每个文案80字以内","level":"must","source":"user"},
+    {"id":"W2","text":"不剧透结局","level":"must","source":"user"},
+    {"id":"W3","text":"突出悬念","level":"prefer","source":"user"}
+  ],
+  "freedoms":[{"name":"叙述视角"},{"name":"节奏和悬念"},{"name":"比喻与语音"}],
+  "deliverables":{"items":5}
+}

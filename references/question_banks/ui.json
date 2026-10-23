@@ -1,0 +1,1 @@
+{"slots":[{"id":"ui_users","importance":"high","question":"主要使用者及他们最重要的操作目标是什么？","why_it_matters":"避免只按美观程度筛选布局"},{"id":"ui_platform","importance":"high","question":"主要平台、屏幕尺寸和可访问性要求是什么？","why_it_matters":"影响交互结构与布局可行性"}]}
