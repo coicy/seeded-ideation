@@ -28,27 +28,37 @@ def pool_item(i, position=None, sig=None, attrs=None, status='pass', evidence='m
 
 class FunnelTests(unittest.TestCase):
     def test_plan_256_4_and_8_batches(self):
-        r=route('plan','--spec',str(SPEC),'--seed',SEED)
-        self.assertEqual(r.returncode,0,r.stderr)
-        self.assertEqual(json.loads(r.stdout)['seed'],SEED)
         r=route('plan','--spec',str(SPEC),'--format','json')
         self.assertEqual(r.returncode,0,r.stderr)
         j=json.loads(r.stdout)
         self.assertEqual((j['planned_initial_candidates'],j['final_items'],j['batch_size']),(256,4,32))
+        self.assertEqual(j['seed_model'],'independent-per-path')
+        self.assertEqual(len(j['paths']),256)
+        self.assertEqual(len(set(x['seed'] for x in j['paths'])),256)
         self.assertEqual(j['initial_candidates_generated'],0)
         self.assertEqual([b['start'] for b in j['batches']],[1,33,65,97,129,161,193,225])
+        self.assertNotIn('seed',j)  # no misleading master seed
 
     def test_repeatable_batch_global_indices(self):
-        args=('batch','--seed',SEED,'--spec',str(SPEC),'--start','33','--format','json')
-        a=route(*args);b=route(*args)
-        self.assertEqual(a.returncode,0,a.stderr)
-        self.assertEqual(a.stdout,b.stdout)
-        doc=json.loads(a.stdout)
-        self.assertEqual(doc['start_index'],32)
-        self.assertEqual((doc['candidates'][0]['number'],doc['candidates'][-1]['number']),(33,64))
-        tail=route('batch','--seed',SEED,'--spec',str(SPEC),'--start','255','--format','json')
-        self.assertEqual(tail.returncode,0,tail.stderr)
-        self.assertEqual([x['number'] for x in json.loads(tail.stdout)['candidates']],[255,256])
+        with tempfile.TemporaryDirectory() as d:
+            plan=Path(d)/'plan.json'
+            p=route('plan','--spec',str(SPEC))
+            self.assertEqual(p.returncode,0,p.stderr)
+            plan.write_text(p.stdout,encoding='utf8')
+            args=('batch','--plan',str(plan),'--spec',str(SPEC),'--start','33','--format','json')
+            a=route(*args);b=route(*args)
+            self.assertEqual(a.returncode,0,a.stderr)
+            self.assertEqual(a.stdout,b.stdout)
+            doc=json.loads(a.stdout)
+            self.assertEqual(doc['start_index'],32)
+            self.assertEqual((doc['candidates'][0]['number'],doc['candidates'][-1]['number']),(33,64))
+            self.assertEqual(len(set(x['seed'] for x in doc['candidates'])),32)
+            tail=route('batch','--plan',str(plan),'--spec',str(SPEC),'--start','255','--format','json')
+            self.assertEqual(tail.returncode,0,tail.stderr)
+            self.assertEqual([x['number'] for x in json.loads(tail.stdout)['candidates']],[255,256])
+            single=route('replay','--plan',str(plan),'--spec',str(SPEC),'--start','35','--format','json')
+            self.assertEqual(single.returncode,0,single.stderr)
+            self.assertEqual(json.loads(single.stdout)['candidates'][0],doc['candidates'][2])
 
     def test_256_pool_rejects_fail_uncertain_and_dedups(self):
         sys.path.insert(0,str(ROOT/'scripts'))

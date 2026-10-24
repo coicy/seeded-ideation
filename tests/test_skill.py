@@ -26,8 +26,9 @@ class RequestLedSkillTests(unittest.TestCase):
         self.assertEqual(r.returncode,0,r.stderr)
         obj=json.loads(r.stdout)
         self.assertEqual(obj['deliverables']['max_new_attributes'],7)
-        self.assertEqual(obj['count'],20)
-        self.assertEqual(len(obj['candidates']),20)
+        self.assertEqual(obj['count'],1)
+        self.assertEqual(len(obj['candidates']),1)
+        self.assertEqual(len(obj['seeds']),1)
         self.assertNotIn('novelty_budget',obj)
         self.assertEqual(obj['candidates'][0]['exploration_axis']['name'] in [v['name'] for v in obj['freedoms']],True)
 
@@ -42,13 +43,13 @@ class RequestLedSkillTests(unittest.TestCase):
         self.assertEqual(r.returncode,0,r.stderr)
         obj=json.loads(r.stdout)
         self.assertIn('不必沿用旧的栏目',obj['request'])
-        self.assertEqual(len(obj['candidates']),4)
+        self.assertEqual(len(obj['candidates']),1)
         self.assertFalse(any('anchored' in str(x) for x in obj.values()))
 
     def test_non_game_use_is_supported(self):
         r=run('replay','--seed',SEED,'--spec',str(EX/'writing_campaign.json'),'--format','json')
         self.assertEqual(r.returncode,0,r.stderr)
-        self.assertEqual(json.loads(r.stdout)['count'],5)
+        self.assertEqual(json.loads(r.stdout)['count'],1)
 
     def test_direct_short_form(self):
         r=run('replay','--seed',SEED,'--request','设计四种界面布局',
@@ -111,13 +112,16 @@ class RequestLedSkillTests(unittest.TestCase):
         spec=str(EX/'ux_redesign.json')
         a=run('new','--spec',spec,'--format','json')
         self.assertEqual(a.returncode,0,a.stderr)
-        seed=json.loads(a.stdout)['seed']
+        data=json.loads(a.stdout)
+        self.assertEqual(data['count'],4)
+        self.assertEqual(len({x['seed'] for x in data['candidates']}),4)
+        seed=data['seeds'][0]['seed']
         self.assertEqual(len(seed),16)
         b=run('mutate','--seed',seed,'--spec',spec,'--edits','2','--format','json')
         self.assertEqual(b.returncode,0,b.stderr)
         obj=json.loads(b.stdout)
         self.assertEqual(len(obj['mutation_positions_1_based']),2)
-        self.assertNotEqual(obj['seed'],seed)
+        self.assertNotEqual(obj['seeds'][0]['seed'],seed)
 
 
 if __name__=='__main__':unittest.main()

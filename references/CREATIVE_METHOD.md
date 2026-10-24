@@ -1,8 +1,8 @@
-# Creative method — randomized inspiration under user-led scope
+# Creative method — independent seeds per creative path under user-led scope
 
 ## 1. Start with the user's task, not the glyph
 
-Before any seed, briefly restate the goal, quantity, genre/domain, compatibility requirements, explicit freedom to redesign, and what success looks like. A fresh image brief, an enterprise UI workflow, and a card mechanic have different relevant innovation spaces. The skill must not pretend all are games.
+Before any seeds, briefly restate the goal, quantity, genre/domain, compatibility requirements, explicit freedom to redesign, and what success looks like. A fresh image brief, an enterprise UI workflow, and a card mechanic have different relevant innovation spaces. The skill must not pretend all are games.
 
 ## 2. Observe characters without importing hidden constraints
 
@@ -38,3 +38,7 @@ For a multi-idea request, the seed should diversify a **candidate pool**, not di
 ## 8. Where this method fits in a complete design job (v1.5)
 
 Random character associations are one *divergent exploration technique*, not a universal design lifecycle. Apply them after framing the actual need and researching the constraints when useful. Before delivering a design, compare alternatives, detail the chosen solution, define acceptance criteria and verify where practical. A seed is not evidence that a design works, and a replayable route does not reproduce design decisions or physical/UX outcomes. For cross-domain workflow and honest verification statuses see `DESIGN_WORKFLOW.md` and `DELIVERY_CONTRACT.md`.
+
+## Independent creative paths (v1.6)
+
+One independent random seed is assigned to exactly one creative exploration route; neither a shared seed nor a route-number salt is a valid substitute. Use a saved manifest to reproduce the entire exploration, including seed-to-route provenance. Evaluating several unrelated seed paths expands search breadth, but it does not guarantee semantic independence of Agent-generated concepts.

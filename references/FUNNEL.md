@@ -1,4 +1,4 @@
-# Large-pool ideation and selection (v1.3)
+# Large-pool independent-seed ideation and selection (v1.6)
 
 ## Goal
 
@@ -10,7 +10,7 @@ Requirements with `level: must` are exclusion conditions. `prefer` and `explore`
 
 ## 2. Batch candidate generation
 
-Generate 8 batches × 32 short concepts, but don't just assign a unique number to near-synonymous adjectives. The Agent must actually write the concept, store an idea ID, describe its mechanism/idea in 1–3 sentences, note the origin character connection, and attach candidate-level reasoning. Consider prompt diversification along request-relevant axes. **Route prompt count does not equal candidate idea count.**
+Independently draw **256 different seeds, one seed per path**; then generate 8 batches × 32 short concepts, but don't just assign a unique number to near-synonymous adjectives. The Agent must actually write the concept, store an idea ID, describe its mechanism/idea in 1–3 sentences, note the origin character connection, and attach candidate-level reasoning. Consider prompt diversification along request-relevant axes. **Route prompt count does not equal candidate idea count.**
 
 If generated pool quality plateaus, probe missing modes of thought rather than expanding redundant styles. If user asks for rapid suggestions, reduce P or stop early and disclose what was done.
 
@@ -23,6 +23,9 @@ If generated pool quality plateaus, probe missing modes of thought rather than e
   "items": [
     {
       "id": "idea-0001",
+      "path_number": 1,
+      "seed": "K7M28QVAT3XPH6RD",
+      "seed_fingerprint": "<compute from seed_ideation.fingerprint(seed)>",
       "concept": "Short unique design description, not only a route label",
       "position": "core differentiated role in the user's vocabulary",
       "mechanism_signature": "time:handoff:on-completion",
@@ -38,6 +41,7 @@ If generated pool quality plateaus, probe missing modes of thought rather than e
 }
 ```
 
+- When using a v1.6 plan, pass `--plan plan.json` to the selector, and record `path_number`, exact path `seed`, and `seed_fingerprint` for **every** candidate. The script rejects missing, repeated or inconsistent path↔seed mapping. Replace the placeholder fingerprint in the schema with the actual output from the manifest. An isolated candidate without a plan can still be filtered, but no lineage audit is claimed.
 - Every `must` requirement (by exact `id`; fallback `MUST-n` if none) **must** have `pass` and nonblank evidence to survive. `fail`, `uncertain`, missing checks, or missing evidence block selection. Do not label unsupported assumptions as `pass`.
 - `mechanism_signature` and `mechanism_tags` are agent-assigned descriptions; the script cannot validate their semantic truth. Use stable standardized signatures for true duplicates and tags shared by related concepts. Changing labels only to evade deduplication is invalid.
 - Scores 0–5 are **judgment calls**, not measurements; give lower fit to irrelevant approaches no matter how novel. Weights: fit 0.40, usefulness 0.25, feasibility 0.20, novelty 0.15. Diversity is a separate small rerank using tag overlap and repeated position.
@@ -59,4 +63,4 @@ Intermediate counts are maxima or targets: if only 47 pass hard rules, report 47
 
 `funnel_select.py` performs structural checks on *provided* Agent reviews, excludes non-passes, deduplicates exact declared signatures, and uses deterministic diversity-aware reranking. It does not run a semantic evaluator, discover latent factual errors, or prove the idea objectively best. An independent reviewer or project tests should challenge finalists, particularly high-stakes or engine-specific constraints.
 
-Do not invent screening statistics. Do not claim an LLM-generated prose response is deterministic merely because route cards are replayable. Keep the seed separate from project/runtime simulation seeds.
+Do not confuse 256 independently sampled seeds with 256 actually written design concepts; claiming the latter requires recording each concept. Do not invent screening statistics. Do not claim an LLM-generated prose response is deterministic merely because route cards are replayable. Keep the seed separate from project/runtime simulation seeds.

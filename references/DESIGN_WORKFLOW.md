@@ -32,7 +32,7 @@ Capture problem, audience, desired outcome, observed baseline, constraints (must
 
 Gather relevant material: existing product/design records, actual user tasks, platform affordances, competitive analogues, operational constraints, engineering interfaces and known failures. Cite evidence in the design workbook. It is legitimate to state that external research was not necessary for a quick self-contained problem; do not simulate having read sources. State plausible alternative causal models and risks. When comparing options, change their *decision structure*, not labels/colors. Preserve a simple baseline option where useful.
 
-**Optional creative branch:** when breadth/diversity is the bottleneck, use `seed_ideation.py plan`/`batch` and `funnel_select.py` to expand and select **real written ideas**. No route cards masquerading as ideas. For ordinary refinement, deterministic heuristic analysis, direct synthesis or two deliberate alternatives may be better. Store route IDs/seed in a separate appendix if used.
+**Optional creative branch:** when breadth/diversity is the bottleneck, generate independently seeded paths using `seed_ideation.py plan`/`batch --plan plan.json` and `funnel_select.py` to expand and select **real written ideas**. No route cards masquerading as ideas. For ordinary refinement, deterministic heuristic analysis, direct synthesis or two deliberate alternatives may be better. Store route IDs/seed in a separate appendix if used.
 
 **Gate:** options satisfy the actual user brief or are marked incompatible; external findings are distinguishable from guesses.
 

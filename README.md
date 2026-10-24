@@ -1,4 +1,4 @@
-# Seeded Ideation v1.5 | 通用设计工作流 + 可选随机创意探索
+# Seeded Ideation v1.6 | 每路径独立种子 + 通用设计工作流 + 可选随机创意探索
 
 **核心目标：让 Agent 从设计需求到可交付方案形成可复核的闭环，同时保留可追溯的随机种子创意发散能力。**
 
@@ -28,7 +28,9 @@ python scripts/design_audit.py --spec examples/quick_design_spec.json --workbook
 
 `structure_pass=true` 只表示**声明式结构与追踪关系完整**；`verification_status=incomplete` 表示还有未执行的验收，**不能冒充设计通过真实验证**。详见 `references/DESIGN_WORKFLOW.md` 和 `references/DELIVERY_CONTRACT.md`。
 
-## 可选：种子驱动的多候选探索
+## 可选：独立随机种子驱动的多候选探索
+
+**核心不变量：一个种子对应一条探索路径。** 规划 256 条路径就独立生成 256 个不同的随机种子；32 条为一批仅用于减少计算开销，不表示一批共享同一个种子。保存 `plan.json` 才能完整重放。
 
 ## 需求访谈（新）
 
@@ -43,22 +45,35 @@ python scripts/brief_gate.py --spec examples/cards_brief_missing.json --max-ques
 ## 256 → 4 示例
 
 ```bash
-# 获得包含随机种子的计划和八个批次
+# 独立抽取256个随机种子、建立256条一对一绑定的路径清单和八个批次
 python scripts/seed_ideation.py plan --spec examples/four_ideas_funnel.json --wildness 5 > plan.json
 
-# 从 plan.json 中读取 seed，逐批生成可复现的创意路线
-python scripts/seed_ideation.py batch --seed 'K7M2-8QVA-T3XP-H6RD' --spec examples/four_ideas_funnel.json --start 1 --format json > batch1.json
+# 从 plan.json 中读取该批的32个独立种子，逐一生成可复现的路线
+python scripts/seed_ideation.py batch --plan plan.json --spec examples/four_ideas_funnel.json --start 1 --format json > batch1.json
 # 同样生成 --start 33,65,97,129,161,193,225
 
 # Agent 根据每个 route 生成真实的短构想，逐条审查并记录到 pool.json
 # 硬性条件不合格或未核实的方案，在此阶段淘汰
-python scripts/funnel_select.py --spec examples/four_ideas_funnel.json --candidates pool.json --output selection_report.json
+python scripts/funnel_select.py --spec examples/four_ideas_funnel.json --plan plan.json --candidates pool.json --output selection_report.json
 
 # 将四个胜出方案扩写，附上要求的变体，并复查完整结果
 python scripts/seed_ideation.py validate --spec examples/four_ideas_funnel.json --candidates final.json
 ```
 
-`plan` 和 `batch` **只生成种子路线，不自动撰写 256 个完整方案**。Agent 必须按批次真实创作候选、给出要求逐条核查与证据后才能声称探索了对应数量。筛选脚本会拒绝硬约束失败、未验证或缺少证据的项目，并按声明的机制标签做去重与多样性重排；无法自动证明语义上的真实合规或创新质量。
+`plan` 为每条路径生成**一个独立种子**，`batch` 使用该路径自己的种子产生路线，但**不自动撰写 256 个完整方案**。Agent 必须按批次真实创作候选、给出要求逐条核查与证据后才能声称探索了对应数量。筛选脚本会拒绝硬约束失败、未验证或缺少证据的项目，并按声明的机制标签做去重与多样性重排；无法自动证明语义上的真实合规或创新质量。
+
+## 单条路径重放与向后兼容
+
+```bash
+# 仅重放清单中的第35条路径
+python scripts/seed_ideation.py replay --spec examples/four_ideas_funnel.json --plan plan.json --start 35 --format json
+# 也可用一条具体的种子单独重放；不会额外派生更多路径
+python scripts/seed_ideation.py replay --spec examples/four_ideas_funnel.json --seed K7M2-8QVA-T3XP-H6RD --format json
+# 快速生成8条路径：8个独立种子，而非1个主种子
+python scripts/seed_ideation.py new --spec examples/four_ideas_funnel.json --count 8 --format json
+```
+
+v1.6 是行为修正：不再接受旧版 `plan --seed` 或 `batch --seed` 约定；旧版单主种子计划需要重新生成，不能将一条旧种子假装成多个独立种子。
 
 ## 不必永远 256 候选
 

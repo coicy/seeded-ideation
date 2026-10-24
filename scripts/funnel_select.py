@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 import sys
 from typing import Any
-from seed_ideation import checksum, validate_spec, VERSION
+from seed_ideation import checksum, validate_spec, VERSION, load_plan, fingerprint
 
 WEIGHTS={'fit':0.40, 'usefulness':0.25, 'feasibility':0.20, 'novelty':0.15}
 
@@ -136,16 +136,46 @@ def choose_final_beam(items:list[dict[str,Any]],n:int,*,
     return [items[i] for i in best_partial]
 
 
-def funnel(spec:dict[str,Any],data:dict[str,Any])->dict[str,Any]:
+def audit_seed_lineage(entries:list[Any],plan:dict[str,Any])->dict[str,Any]:
+    """Fail closed when candidate/seed identity is not a 1:1 mapping.
+
+    This verifies declarations and manifest links, not whether an agent actually
+    used its assigned seed to compose the idea.
+    """
+    expected={p['number']:p for p in plan['paths']}
+    seen_numbers=set();seen_seeds=set()
+    for index,item in enumerate(entries,1):
+        if not isinstance(item,dict):raise ValueError(f'item {index} lacks seed lineage object')
+        number=item.get('path_number');seed=item.get('seed')
+        if type(number) is not int or number not in expected:
+            raise ValueError(f'item {index} lacks valid path_number from plan')
+        if not isinstance(seed,str) or seed!=expected[number]['seed']:
+            raise ValueError(f'item {index} seed mismatch for path {number}')
+        if item.get('seed_fingerprint')!=fingerprint(seed):
+            raise ValueError(f'item {index} seed fingerprint mismatch')
+        if number in seen_numbers or seed in seen_seeds:
+            raise ValueError(f'duplicate candidate seed/path for path {number}')
+        seen_numbers.add(number);seen_seeds.add(seed)
+    return {'status':'declared_path_linkage_checked',
+            'manifest_fingerprint':plan['manifest_fingerprint'],
+            'candidate_paths':len(seen_numbers),
+            'missing_paths':len(expected)-len(seen_numbers),
+            'semantic_seed_usage_verified':False}
+
+
+def funnel(spec:dict[str,Any],data:dict[str,Any],
+           plan:dict[str,Any]|None=None)->dict[str,Any]:
     validate_spec(spec)
     entries=data.get('items')
     if not isinstance(entries,list):raise ValueError('pool document must contain items array')
+    lineage=audit_seed_lineage(entries,plan) if plan is not None else None
     goal=spec.get('deliverables',{}).get('items',4)
     ideation=spec.get('ideation',{})
     target_pool=ideation.get('pool_size',min(256,goal*16))
     if ideation.get('require_full_pool',False) and len(entries)<target_pool:
         return {'selection_complete':False, 'reason':'incomplete_pool',
-                'observed_pool':len(entries),'required_pool':target_pool,'finalists':[]}
+                'observed_pool':len(entries),'required_pool':target_pool,'finalists':[],
+                'seed_lineage':lineage}
     required_ids=must_ids(spec)
     rejected=[];eligible=[];seen_id=set()
     for index,item in enumerate(entries):
@@ -187,7 +217,7 @@ def funnel(spec:dict[str,Any],data:dict[str,Any])->dict[str,Any]:
     return {'tool':'seeded-ideation','version':VERSION,'spec_fingerprint':checksum(spec),
             'selection_complete':pass_all,'reason':reason,
             'observed_pool':len(entries),'required_pool':target_pool,
-            'eligible_before_dedup':len(eligible),'rejected':len(rejected),
+            'seed_lineage':lineage,'eligible_before_dedup':len(eligible),'rejected':len(rejected),
             'rejection_counts':dict(Counter(reason for row in rejected for reason in row['reasons'])),
             'rejection_samples':rejected[:20],
             'deduplicated':len(duplicates),'duplicate_samples':duplicates[:20],
@@ -204,10 +234,12 @@ def main()->int:
     p.add_argument('--spec',required=True)
     p.add_argument('--candidates',required=True,help='JSON object {"items": [...]}; short idea evaluations')
     p.add_argument('--output',help='optional report path')
+    p.add_argument('--plan',help='v1.6 seed manifest: enforce one seed per candidate path')
     args=p.parse_args()
     try:
         spec=validate_spec(json.loads(Path(args.spec).read_text(encoding='utf8')))
-        result=funnel(spec,json.loads(Path(args.candidates).read_text(encoding='utf8')))
+        plan=load_plan(args.plan,spec) if args.plan else None
+        result=funnel(spec,json.loads(Path(args.candidates).read_text(encoding='utf8')),plan=plan)
         payload=json.dumps(result,ensure_ascii=False,indent=2)
         if args.output:Path(args.output).write_text(payload+'\n',encoding='utf8')
         else:print(payload)

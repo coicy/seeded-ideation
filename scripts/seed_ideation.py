@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 from glyphs import SHAPES
 
-VERSION = '1.5.0'
+VERSION = '1.6.0'
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 DEFAULT_LENGTH = 16
 MAX_SEED_LENGTH = 64
@@ -137,42 +137,90 @@ def quick_spec(args: argparse.Namespace) -> dict[str,Any]:
                           'ideation':{'pool_size':args.pool_size} if args.pool_size else {}})
 
 
-def get_anchors(seed:str,spec_hash:str,candidate_index:int)->list[dict[str,Any]]:
-    positions=sorted(range(len(seed)),key=lambda p:digest(seed,spec_hash,'anchor',candidate_index,p))[:4]
+def get_anchors(seed:str,spec_hash:str)->list[dict[str,Any]]:
+    positions=sorted(range(len(seed)),key=lambda p:digest(seed,spec_hash,'anchor',p))[:4]
     return [{'position':p+1,'char':seed[p],'role':ROLES[j],
              'shape_hint':SHAPES.get(seed[p],'自行观察字形、音韵或语义')}
             for j,p in enumerate(positions)]
 
 
-def make_brief(seed:str,spec:dict[str,Any],count:Optional[int]=None,wildness:int=3,start_index:int=0)->dict[str,Any]:
-    validate_spec(spec)
-    if not 1<=wildness<=5: raise ValueError('wildness must be 1..5')
-    n=count if count is not None else spec.get('deliverables',{}).get('items',4)
-    if not 1<=n<=4096: raise ValueError('count must be 1..4096')
-    if not 0<=start_index<=4095 or start_index+n>4096: raise ValueError('candidate index out of bounds')
+def formatted_seed(seed:str)->str:
+    return '-'.join(seed[i:i+4] for i in range(0,len(seed),4))
+
+
+def fingerprint(seed:str)->str:
+    return hashlib.sha256(seed.encode('utf8')).hexdigest()[:12]
+
+
+def independent_paths(count:int,length:int=DEFAULT_LENGTH,start:int=1)->list[dict[str,Any]]:
+    """Draw one fresh, *independent* cryptographic random seed for EACH path.
+
+    This is not a master seed with indexed derivatives. Persist the returned
+    manifest to replay a run; independently sampled draws cannot be regenerated
+    from a single master string.
+    """
+    if type(count) is not int or not 1<=count<=4096:raise ValueError('seed count must be 1..4096')
+    if type(start) is not int or start<1 or start+count-1>4096:raise ValueError('path number out of bounds')
+    if type(length) is not int or not 4<=length<=MAX_SEED_LENGTH:
+        raise ValueError('seed length must be 4..64')
+    used=set();paths=[]
+    for number in range(start,start+count):
+        seed=random_seed(length)
+        while seed in used:seed=random_seed(length)
+        used.add(seed)
+        paths.append({'number':number,'seed':seed,'formatted_seed':formatted_seed(seed),
+                      'seed_fingerprint':fingerprint(seed)})
+    return paths
+
+
+def manifest_fingerprint(spec_hash:str,paths:list[dict[str,Any]])->str:
+    return checksum({'schema':'one-independent-seed-per-path-v1',
+                     'spec_fingerprint':spec_hash,
+                     'paths':[(p['number'],p['seed']) for p in paths]})
+
+
+def make_route(path:dict[str,Any],spec:dict[str,Any],wildness:int)->dict[str,Any]:
+    seed=canonicalize_seed(path['seed'])
     sid=checksum(spec)
     axes=spec.get('freedoms') or [{'id':a,'name':b,'description':'仅在本次用户请求允许时应用'} for a,b in OPEN_AXES]
-    order=sorted(range(len(axes)),key=lambda i:digest(seed,sid,'axis',i))
-    routes=[]
-    for offset in range(n):
-        idx=start_index+offset
-        axis=axes[order[idx % len(axes)]]
-        routes.append({'number':idx+1,'exploration_axis':axis,
-                       'anchors':get_anchors(seed,sid,idx),
-                       'instructions':[
-                           '从至少两个种子字符提炼联想，不把字形词典当成机制指令。',
-                           '先满足用户本次要求和硬约束；在允许的部分映射联想。',
-                           '如果联想与当前需求无关，重解释字符，不改写用户需求。',
-                           '候选与其他候选应在决策或因果结构上有实质差异，不只调整名字和参数。',
-                       ]})
-    return {'tool':'seeded-ideation','version':VERSION,'seed':seed,
-            'formatted_seed':'-'.join(seed[i:i+4] for i in range(0,len(seed),4)),
-            'seed_fingerprint':hashlib.sha256(seed.encode('utf8')).hexdigest()[:12],
-            'spec_fingerprint':sid,'request':spec['request'],
+    axis=axes[sorted(range(len(axes)),key=lambda i:digest(seed,sid,'axis',i))[0]]
+    return {'number':path['number'],'seed':seed,
+            'formatted_seed':formatted_seed(seed),'seed_fingerprint':fingerprint(seed),
+            'exploration_axis':axis,'anchors':get_anchors(seed,sid),
+            'instructions':[
+                '本候选有自己的独立种子。仅从本种子提取联想，不借用其他候选的种子或把批次编号当随机因子。',
+                '从至少两个种子字符提炼联想，不把字形词典当成机制指令。',
+                '先满足用户本次要求和硬约束；在允许的部分映射联想。',
+                '如果联想与当前需求无关，重解释字符，不改写用户需求。',
+                '候选与其他候选应在决策或因果结构上有实质差异，不只调整名字和参数。',
+            ]}
+
+
+def make_brief_from_paths(paths:list[dict[str,Any]],spec:dict[str,Any],wildness:int=3)->dict[str,Any]:
+    validate_spec(spec)
+    if not 1<=wildness<=5:raise ValueError('wildness must be 1..5')
+    if not paths:raise ValueError('paths cannot be empty')
+    if len(paths)>4096:raise ValueError('too many paths')
+    seen_seeds=set();seen_numbers=set()
+    for path in paths:
+        seed=canonicalize_seed(path['seed'])
+        number=path['number']
+        if type(number) is not int or not 1<=number<=4096 or number in seen_numbers:
+            raise ValueError('path numbers must be unique integers in 1..4096')
+        if seed in seen_seeds:raise ValueError('duplicate seed assigned to multiple paths')
+        if path.get('seed_fingerprint',fingerprint(seed))!=fingerprint(seed):
+            raise ValueError('seed fingerprint does not match seed')
+        seen_seeds.add(seed);seen_numbers.add(number)
+    routes=[make_route(path,spec,wildness) for path in paths]
+    return {'tool':'seeded-ideation','version':VERSION,'seed_model':'independent-per-path',
+            'seeds':[{'number':r['number'],'seed':r['seed'],
+                      'seed_fingerprint':r['seed_fingerprint']} for r in routes],
+            'spec_fingerprint':checksum(spec),'request':spec['request'],
             'context':spec.get('context',{}),'requirements':spec.get('requirements',[]),
             'freedoms':spec.get('freedoms',[]),
             'deliverables':spec.get('deliverables',{}),'unknowns':spec.get('unknowns',[]),
-            'count':n,'start_index':start_index,'wildness':wildness,'candidates':routes,
+            'count':len(routes),'start_index':min(seen_numbers)-1,'wildness':wildness,
+            'candidates':routes,
             'agent_instructions':[
                 '用户当前要求是此次设计的最高任务意图；既有项目资料用于正确理解背景，不能被误当成用户永不允许修改的规则。',
                 '辨别明确硬约束、偏好、用户明确授权修改的范围、背景资料与未定义内容；禁止自行把偏好升格为硬规则。',
@@ -183,37 +231,83 @@ def make_brief(seed:str,spec:dict[str,Any],count:Optional[int]=None,wildness:int
                 '不得强制修改核心循环/引入异域机制。异域类比只是一种可选思考手段，并非必做项目。',
                 '候选生成后按当前请求的限制进行审查，区分明确冲突、潜在工程依赖、没有证据的猜测。',
                 '交付足量内容，覆盖用户要求的数量、变体、独立定位和差异，不用少量示例冒充完整交付。',
-                '种子和指令卡可确定性回放；自然语言生成不保证字节级重现；不把设计种子混同项目模拟种子。',
+                '每个候选只对应自己的一个独立随机种子；记录全部种子以便逐条重放。随机路线可重放，LLM输出仍不保证逐字一致。',
             ]}
 
 
-def make_plan(seed:str,spec:dict[str,Any],wildness:int=3,
-              pool_size:Optional[int]=None,batch_size:Optional[int]=None)->dict[str,Any]:
+def make_brief(seed:str,spec:dict[str,Any],count:Optional[int]=None,
+               wildness:int=3,start_index:int=0)->dict[str,Any]:
+    """Replay ONE path from ONE seed. Multiple paths require multiple seeds."""
+    if count not in (None,1):raise ValueError('one seed may only map to one path; use new/plan for many')
+    canonical=canonicalize_seed(seed)
+    return make_brief_from_paths([{'number':start_index+1,'seed':canonical}],spec,wildness)
+
+
+def make_plan(spec:dict[str,Any],wildness:int=3,
+              pool_size:Optional[int]=None,batch_size:Optional[int]=None,
+              seed_length:int=DEFAULT_LENGTH)->dict[str,Any]:
     validate_spec(spec)
     ideation=spec.get('ideation',{})
     final_count=spec.get('deliverables',{}).get('items',4)
     pool=pool_size if pool_size is not None else ideation.get('pool_size',min(256,final_count*16))
     batch=batch_size if batch_size is not None else ideation.get('batch_size',32)
-    if type(pool) is not int or not final_count<=pool<=4096: raise ValueError('pool_size must be between final item count and 4096')
-    if type(batch) is not int or not 1<=batch<=4096: raise ValueError('batch_size must be 1..4096')
-    if not 1<=wildness<=5: raise ValueError('wildness must be 1..5')
+    if type(pool) is not int or not final_count<=pool<=4096:
+        raise ValueError('pool_size must be between final item count and 4096')
+    if type(batch) is not int or not 1<=batch<=4096:
+        raise ValueError('batch_size must be 1..4096')
+    if not 1<=wildness<=5:raise ValueError('wildness must be 1..5')
+    paths=independent_paths(pool,seed_length)
+    sid=checksum(spec)
     return {
-      'tool':'seeded-ideation','version':VERSION,'seed':seed,
-      'formatted_seed':'-'.join(seed[i:i+4] for i in range(0,len(seed),4)),
-      'spec_fingerprint':checksum(spec),'final_items':final_count,
-      'planned_initial_candidates':pool,'initial_candidates_generated':0,
+      'tool':'seeded-ideation','version':VERSION,'seed_model':'independent-per-path',
+      'spec_fingerprint':sid,'manifest_fingerprint':manifest_fingerprint(sid,paths),
+      'final_items':final_count,'planned_initial_candidates':pool,
+      'initial_candidates_generated':0,'seed_count':len(paths),'paths':paths,
       'batch_size':batch,'wildness':wildness,
       'require_full_pool':ideation.get('require_full_pool',False),
       'batches':[{'batch':i+1,'start':start+1,'count':min(batch,pool-start)}
                  for i,start in enumerate(range(0,pool,batch))],
       'selection_stages':[
-        'Generate brief one-line concepts for every planned route; a route card is NOT itself a generated idea.',
-        'Semantic must-rule gate per idea with evidence: pass/fail/uncertain. Exclude fail and uncertain, even if inventive.',
-        'Deduplicate mechanisms, cluster distinct approaches and identify gaps; regenerate within the original request if needed.',
-        'Assess fit, usefulness, feasibility and novelty; rerank for diversity under group-wide budgets.',
-        'Expand ONLY the selected final items, then re-check full requirements and variants.'
+        'Every path has an independently sampled seed; save this plan JSON before generating batches.',
+        'Generate one actual brief concept for every planned seed path; route prompts alone are not concepts.',
+        'Semantic hard-rule gate per idea with evidence; reject failures and uncertain claims.',
+        'Deduplicate similar approaches, review novelty, and rank under global constraints.',
+        'Expand only the selected finalists; retest full requirements and meaningful differences.'
       ]
     }
+
+
+def load_plan(path:str,spec:dict[str,Any])->dict[str,Any]:
+    try:plan=json.loads(Path(path).read_text(encoding='utf8'))
+    except (OSError,json.JSONDecodeError) as e:raise ValueError(f'invalid plan: {e}') from e
+    if not isinstance(plan,dict) or plan.get('seed_model')!='independent-per-path':
+        raise ValueError('legacy single-seed plan unsupported; regenerate a v1.6 multi-seed plan')
+    if plan.get('version')!=VERSION:raise ValueError('plan version differs; generate a new plan')
+    if plan.get('spec_fingerprint')!=checksum(spec):
+        raise ValueError('plan spec fingerprint mismatch; use the original request spec')
+    paths=plan.get('paths')
+    if not isinstance(paths,list) or not paths or len(paths)>4096:
+        raise ValueError('plan paths missing or invalid')
+    if len(paths)!=plan.get('seed_count') or len(paths)!=plan.get('planned_initial_candidates'):
+        raise ValueError('plan seed count differs from path count')
+    seen=set()
+    for i,path in enumerate(paths):
+        if not isinstance(path,dict) or path.get('number')!=i+1:
+            raise ValueError('plan paths must have consecutive 1-based numbers')
+        seed=path.get('seed')
+        if not isinstance(seed,str) or canonicalize_seed(seed)!=seed or not all(c in ALPHABET for c in seed):
+            raise ValueError(f'plan path {i+1} has invalid generated seed')
+        if seed in seen:raise ValueError('plan contains duplicate seeds')
+        seen.add(seed)
+        if path.get('formatted_seed')!=formatted_seed(seed) or path.get('seed_fingerprint')!=fingerprint(seed):
+            raise ValueError(f'plan path {i+1} seed metadata mismatch')
+    if plan.get('manifest_fingerprint')!=manifest_fingerprint(checksum(spec),paths):
+        raise ValueError('plan manifest fingerprint mismatch')
+    if type(plan.get('batch_size')) is not int or plan['batch_size']<1:
+        raise ValueError('plan batch_size invalid')
+    if type(plan.get('wildness')) is not int or not 1<=plan['wildness']<=5:
+        raise ValueError('plan wildness invalid')
+    return plan
 
 
 def mechanical_validate(spec:dict[str,Any],candidate_doc:dict[str,Any])->dict[str,Any]:
@@ -260,21 +354,21 @@ def mechanical_validate(spec:dict[str,Any],candidate_doc:dict[str,Any])->dict[st
 
 def as_markdown(brief:dict[str,Any])->str:
     lines=['# Seeded Ideation / 需求驱动创意指令卡',
-           f'- 种子：`{brief["formatted_seed"]}`',
+           f'- 每条路径独立的种子数：{len(brief["seeds"])}',
            f'- 版本：`{brief["version"]}`；需求指纹：`{brief["spec_fingerprint"]}`',
            f'- 当前要求：{brief["request"]}',
-           f'- 发散强度：{brief["wildness"]}/5；候选数：{brief["count"]}']
-    if brief.get('context'): lines.append(f'- 已提供背景：{json.dumps(brief["context"],ensure_ascii=False)}')
+           f'- 发散强度：{brief["wildness"]}/5；路径数：{brief["count"]}']
+    if brief.get('context'):lines.append(f'- 已提供背景：{json.dumps(brief["context"],ensure_ascii=False)}')
     if brief['requirements']:
         lines+=['','## 用户约束、偏好及来源']
         for r in brief['requirements']:
             lines.append(f'- [{r.get("level","must")}/{r.get("source","user")}] {r.get("id", "")}: {r["text"]}')
-    if brief.get('deliverables'): lines.extend(['','## 可量化交付要求',
-                                  json.dumps(brief['deliverables'],ensure_ascii=False)])
-    if brief['unknowns']: lines+=['','## 尚未确定的事项']+[f'- {u}' for u in brief['unknowns']]
-    lines+=['','## 种子字符',' · '.join(f'{i+1}:{x}' for i,x in enumerate(brief['seed']))]
+    if brief.get('deliverables'):lines.extend(['','## 可量化交付要求',
+                                      json.dumps(brief['deliverables'],ensure_ascii=False)])
+    if brief['unknowns']:lines+=['','## 尚未确定的事项']+[f'- {u}' for u in brief['unknowns']]
     for c in brief['candidates']:
-        lines+=['',f'## 候选 {c["number"]} / {c["exploration_axis"]["name"]}']
+        lines+=['',f'## 路径 {c["number"]} / 独立种子 `{c["formatted_seed"]}`',
+                f'- 探索方向：{c["exploration_axis"]["name"]}']
         for a in c['anchors']:
             lines.append(f'- `{a["char"]}`（位置 {a["position"]} / {a["role"]}）→ {a["shape_hint"]}')
         lines+=['- 先映射当前要求，再提出方案；不得把联想当成外加需求。']
@@ -286,22 +380,24 @@ def as_markdown(brief:dict[str,Any])->str:
 def main(argv:Optional[list[str]]=None)->int:
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('action',nargs='?',default='new',choices=['new','replay','mutate','validate','plan','batch'])
-    p.add_argument('--seed');p.add_argument('--length',type=int,default=DEFAULT_LENGTH)
+    p.add_argument('--seed',help='one existing seed: replay or mutate ONE path')
+    p.add_argument('--plan',help='immutable v1.6 per-path seed manifest (batch or replay)')
+    p.add_argument('--length',type=int,default=DEFAULT_LENGTH,help='independent seed length (4..64)')
     p.add_argument('--edits',type=int,default=2)
-    p.add_argument('--spec',help='JSON file describing this user request, its requirements and freedoms')
-    p.add_argument('--request',help='current user request; required unless --spec is supplied')
-    p.add_argument('--context',help='project background or existing design summary (not automatically immutable)')
-    p.add_argument('--hard',action='append',help='explicit hard constraint (repeatable)')
+    p.add_argument('--spec',help='JSON file describing this user request')
+    p.add_argument('--request',help='current user request, unless --spec is supplied')
+    p.add_argument('--context',help='project background (not immutable by default)')
+    p.add_argument('--hard',action='append',help='hard constraint (repeatable)')
     p.add_argument('--prefer',action='append',help='preference (repeatable)')
-    p.add_argument('--axis',action='append',help='allowed exploration axis (repeatable)')
-    p.add_argument('--count',type=int,default=None,help='route count; defaults to spec deliverables.items')
-    p.add_argument('--pool-size',type=int,default=None,help='ideation route pool size, e.g. 256 (plan/batch)')
-    p.add_argument('--batch-size',type=int,default=None,help='routes per batch, e.g. 32 (plan/batch)')
-    p.add_argument('--start',type=int,default=None,help='1-based global route start (batch)')
+    p.add_argument('--axis',action='append',help='exploration axis (repeatable)')
+    p.add_argument('--count',type=int,default=None,help='new: number of independently drawn seeds')
+    p.add_argument('--pool-size',type=int,default=None,help='plan: independently drawn path count')
+    p.add_argument('--batch-size',type=int,default=None,help='plan: paths per batch')
+    p.add_argument('--start',type=int,default=None,help='1-based path number (batch or plan replay)')
     p.add_argument('--wildness',type=int,default=3)
     p.add_argument('--format',choices=['json','markdown'],default='markdown')
-    p.add_argument('--candidates',help='candidate JSON for structural validation')
-    p.add_argument('--require-ready',action='store_true',help='refuse plan/batch if user-need interview is unresolved')
+    p.add_argument('--candidates',help='final design JSON for structural validation')
+    p.add_argument('--require-ready',action='store_true',help='refuse plan/batch if interview unresolved')
     a=p.parse_args(argv)
     try:
         spec=load_spec(a.spec) if a.spec else quick_spec(a)
@@ -312,37 +408,51 @@ def main(argv:Optional[list[str]]=None)->int:
                 qs='; '.join(f"{q['id']}: {q['question']}" for q in readiness['questions_to_ask_now'])
                 raise ValueError(f"clarification required before ideation (pending={readiness['pending_total']}): {qs}")
         if a.action=='validate':
-            if not a.candidates: p.error('validate requires --candidates')
+            if not a.candidates:p.error('validate requires --candidates')
             proposals=json.loads(Path(a.candidates).read_text(encoding='utf8'))
             result=mechanical_validate(spec,proposals)
             print(json.dumps(result,ensure_ascii=False,indent=2))
             return 0 if result['mechanical_pass'] else 1
-        if a.action in ('new','plan'):
-            if a.action=='new' and a.seed: p.error('new generates a seed; use replay --seed')
-            seed=canonicalize_seed(a.seed) if a.seed else random_seed(a.length)
-        else:
-            if not a.seed: p.error(f'{a.action} requires --seed')
-            seed=canonicalize_seed(a.seed)
-        changed=[]
-        if a.action=='mutate': seed,changed=mutate_seed(seed,a.edits)
+        if a.action in ('new','plan') and (a.seed or a.plan):
+            raise ValueError(f'{a.action} generates new independent seeds; omit --seed and --plan')
         if a.action=='plan':
-            plan=make_plan(seed,spec,a.wildness,a.pool_size,a.batch_size)
+            plan=make_plan(spec,a.wildness,a.pool_size,a.batch_size,a.length)
             print(json.dumps(plan,ensure_ascii=False,indent=2))
             return 0
-        if a.action=='batch':
-            if a.start is None or a.start<1: p.error('batch requires --start >= 1')
-            plan=make_plan(seed,spec,a.wildness,a.pool_size,a.batch_size)
-            if a.start>plan['planned_initial_candidates']: p.error('start exceeds pool_size')
-            number=min(plan['batch_size'],plan['planned_initial_candidates']-a.start+1)
-            brief=make_brief(seed,spec,number,a.wildness,start_index=a.start-1)
-            brief['planned_initial_candidates']=plan['planned_initial_candidates']
-        else:
-            brief=make_brief(seed,spec,a.count,a.wildness)
-        if changed: brief['mutation_positions_1_based']=changed
+        if a.action=='new':
+            number=a.count if a.count is not None else spec.get('deliverables',{}).get('items',4)
+            paths=independent_paths(number,a.length)
+            brief=make_brief_from_paths(paths,spec,a.wildness)
+        elif a.action=='batch':
+            if not a.plan or a.seed:raise ValueError('batch requires --plan plan.json; do not supply --seed')
+            if a.start is None or a.start<1:raise ValueError('batch requires --start >= 1')
+            plan=load_plan(a.plan,spec)
+            if a.start>len(plan['paths']):raise ValueError('start exceeds seed path count')
+            paths=plan['paths'][a.start-1:a.start-1+plan['batch_size']]
+            brief=make_brief_from_paths(paths,spec,plan['wildness'])
+            brief['manifest_fingerprint']=plan['manifest_fingerprint']
+            brief['planned_initial_candidates']=len(plan['paths'])
+        elif a.action=='replay':
+            if a.count not in (None,1):raise ValueError('one seed maps to one path; use plan or new for several')
+            if bool(a.seed)==bool(a.plan):raise ValueError('replay requires exactly one of --seed or --plan')
+            if a.plan:
+                if a.start is None or a.start<1:raise ValueError('plan replay requires --start (path number)')
+                plan=load_plan(a.plan,spec)
+                if a.start>len(plan['paths']):raise ValueError('start exceeds seed path count')
+                brief=make_brief_from_paths([plan['paths'][a.start-1]],spec,plan['wildness'])
+                brief['manifest_fingerprint']=plan['manifest_fingerprint']
+            else:
+                brief=make_brief(a.seed,spec,1,a.wildness,(a.start or 1)-1)
+        else: # mutate: still exactly one old seed -> one new seed -> one new path.
+            if not a.seed or a.plan:raise ValueError('mutate requires --seed (one path), not --plan')
+            seed,changed=mutate_seed(canonicalize_seed(a.seed),a.edits)
+            brief=make_brief(seed,spec,1,a.wildness,(a.start or 1)-1)
+            brief['mutation_positions_1_based']=changed
+            brief['mutation_from_fingerprint']=fingerprint(canonicalize_seed(a.seed))
         print(json.dumps(brief,ensure_ascii=False,indent=2) if a.format=='json' else as_markdown(brief))
         return 0
     except (ValueError,OSError,json.JSONDecodeError) as e:
         p.error(str(e))
     return 2
 
-if __name__=='__main__': sys.exit(main())
+if __name__=='__main__':sys.exit(main())

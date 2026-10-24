@@ -41,7 +41,7 @@ Quantitative validator input `items.json`:
 
 The validator measures only exact declared values. It cannot verify whether "resource allocation" actually differs mechanically from other position labels. For a user request with `max_new_attributes`, count unique attribute identifiers **globally** across all ideas. Do not change to "per item" or silently use the maximum.
 
-`new/replay/mutate` default `--count` from `deliverables.items`. This generates a route card for each item; the AI still must create the final design from the route cards. For a very large requested item count, agents may group candidates into batches without changing the required final quantity.
+`new/replay/mutate` default `--count` from `deliverables.items`. This draws an independent random seed for each route card; the AI still must create the final design from the route cards. For a very large requested item count, agents may group candidates into batches without changing the required final quantity.
 
 ### Precedence examples
 
@@ -63,7 +63,7 @@ Optional top-level `ideation` fields:
 }
 ```
 
-`pool_size` describes **initial short concepts to be actually generated**, not just seed prompts. `require_full_pool` asks the mechanical selector to refuse incomplete input when the chosen pool budget is required. Unless set, the default planning budget is `min(256, deliverables.items * 16)` and the default batch is 32. A user-specified 256/4 plan creates eight batches of 32 routes. Candidate pools for `funnel_select.py` use the separate schema in `references/FUNNEL.md`; the old `validate` command applies to the **final output** after elaboration. The same global max-new-attributes rule is checked across the selected finalists.
+`pool_size` describes **initial short concepts to be actually generated**, not just seed prompts. `require_full_pool` asks the mechanical selector to refuse incomplete input when the chosen pool budget is required. Unless set, the default planning budget is `min(256, deliverables.items * 16)` and the default batch is 32. A user-specified 256/4 plan creates **256 independent cryptographically sampled seed values, each bound to exactly one route**, organized into eight batches of 32 routes. Candidate pools for `funnel_select.py` use the separate schema in `references/FUNNEL.md`; the old `validate` command applies to the **final output** after elaboration. The same global max-new-attributes rule is checked across the selected finalists.
 
 ## Requirements interview v1.4
 
@@ -94,3 +94,13 @@ Optional `design` object: `{"mode":"quick|standard|rigorous", "strategy":"direct
 * `compare`: meaningful alternatives with documented rejections/choices.
 
 This profile is optional and does not change seed replay, legacy funnel or old structural final validation. `scripts/design_audit.py` validates an optional separate design workbook as described in `references/DELIVERY_CONTRACT.md`.
+
+## Independent seed identity contract (v1.6)
+
+- One independently sampled seed (`ALPHABET` characters, 4–64 long; default 16) ⇔ one numbered creative exploration path. A batch is a collection of different seeds and never a single seed branching into several routes.
+- `plan` generates P seeds using `secrets` and writes all of them into `paths`. It does not expose any master seed. For replay, save **all of plan.json**. Re-running `plan` intentionally creates fresh independent seeds.
+- `batch --plan plan.json --start N` reads the stored seeds (usually 32 at a time). `replay --plan plan.json --start N` reproduces exactly that route; `replay --seed S` reproduces a single route with seed S. The path's index is an identifier, not an entropy source; same seed+spec+version yields same association independent of numeric path ID.
+- `new --count N` draws N independent seeds. `mutate --seed S` outputs a single changed seed and single changed path; it does not create a multi-route family.
+- `pool.json` candidates include `path_number`, `seed` and `seed_fingerprint` from `plan.json`. Run `funnel_select.py --plan plan.json` to reject mismatches, duplicate/reused seeds and duplicate path assignments. This confirms **declared linkage only**, not that LLM actually followed the seed.
+- The recorded manifest fingerprint is an accidental-corruption check, **not** a cryptographic signature or evidence of independent semantic diversity.
+- **Migration:** v1.5 `plan --seed` and `batch --seed` are intentionally rejected. Recreate a manifest; do not disguise one legacy seed split across many old routes as independently sampled seeds.
