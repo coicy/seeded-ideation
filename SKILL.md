@@ -1,10 +1,10 @@
 ---
 name: seeded-ideation
-description: "Requirement-led random-seed creative ideation with a broad candidate pool, fail-closed requirement screening, deduplication and diversity-aware selection. Use for varied design proposals across games, product, software, UI, writing, or other creative tasks; user intent defines the scope and seeds diversify exploration."
+description: "General design workflow for framing, researching, ideating, comparing, specifying, verifying, iterating and delivering work across games, software, UX, services, visual design, content and other domains. Seeded creative exploration is optional, with auditable constraints and evidence."
 compatibility: "Python 3.9+, standard library only. No network required."
 ---
 
-# Seeded Ideation v1.4 — 需求访谈 · 需求驱动 · 大候选池 · 分层筛选
+# Seeded Ideation v1.5 — 通用设计工作流 · 可选随机创意探索
 
 ## Guiding principles
 
@@ -14,7 +14,33 @@ The final output must be selected from **actual generated ideas**, not merely fr
 
 The skill is **domain-neutral**. Existing project rules must be interpreted in light of the current user request. Never import game-specific constraints, or treat a user preference as an immutable requirement. Equally, do not use high wildness as a license to override the user's instructions.
 
-## Required workflow (for multiple candidate proposals)
+## Primary workflow: design from problem to deliverable
+
+**Do not automatically start with random ideation.** Determine whether the request is to create a design, modify an existing design, critique one, compare alternatives, or implement an agreed design. Select `quick`, `standard`, or `rigorous` effort; choose `direct` for one desired solution or `compare` for genuine alternatives. See `references/DESIGN_WORKFLOW.md`. Existing user/project sources are authoritative only to the extent actually inspected and applicable.
+
+1. **FRAME**: define actual user problem, audience, current state, desired outcome, scope, must/prefer/explore constraints and their provenance, acceptance/success criteria. Ask only when an unresolved choice materially prevents progress; otherwise record a reversible assumption. Use `brief_gate.py` for a substantial unresolved brief.
+2. **EXPLORE**: inspect source designs and relevant evidence, identify gaps and alternatives. If requested breadth, novelty or divergent mechanisms make randomness useful, invoke the *optional* seed/funnel subworkflow below. Otherwise use direct design synthesis, systematic variation or a short comparison. No fabricated research, no mandatory 256 candidates.
+3. **DECIDE**: compare compliance, user value, technical and creative tradeoffs, implementation/maintenance cost and risk; note rejected options. Distinguish an Agent recommendation from **actual user approval**. Do not turn a proposed direction into a binding product decision.
+4. **SPECIFY**: produce the requested *real* output (design spec, diagrams/source, rules, flows, interface contracts, working code, assets, etc.) at sufficient precision for use. Link mandatory requirements to artifacts, define observable acceptance criteria and cover failure/boundary cases.
+5. **VERIFY AND ITERATE**: walkthrough, test, prototype, simulate, review or explicitly mark verification pending. When tests fail, revise affected design and rerun relevant checks. `pass` needs observed evidence, not optimism; machine structural checks are not semantic or empirical validation.
+6. **HANDOFF**: provide actual artifacts and locations, tradeoffs, changes, unresolved items, tests and next actions. Use honest statuses `draft`, `review_ready` or `validated`; never claim validated if acceptance remains untested. Save a detailed audit record when the size/risk justifies it.
+
+Use `scripts/design_audit.py` with the optional cross-domain `workbook.json` when the task is substantial or needs traceability:
+
+```bash
+python scripts/design_audit.py --spec examples/general_design_spec.json \
+  --workbook examples/general_design_workbook.json --through specify
+python scripts/design_audit.py --spec examples/general_design_spec.json \
+  --workbook examples/general_design_workbook.json --through handoff
+```
+
+For one simple self-contained design, `examples/quick_design_spec.json` + `examples/quick_design_workbook.json` illustrate a lightweight direct path. A passed structural audit means *declared fields and links are present*, **not** that a design is correct, a prototype was run, or a user approved it. See `references/DELIVERY_CONTRACT.md`.
+
+### Optional divergent branch: seed → candidate pool → funnel
+
+Use this only when the user wants *multiple meaningfully different proposals*, or the goal demonstrably benefits from broader exploration. Preserve v1.4 commands and reproducible seed routes; the old workflow below describes this **subprocess**, not an obligation on every design request.
+
+## Divergent ideation subworkflow (for multiple candidate proposals)
 
 1. **Understand request and interview before ideation**: extract the deliverable count `K`, current request, references, explicit `must` constraints, `prefer` criteria, allowed freedoms, unknowns. Fetch relevant project context when necessary. Write a provisional request spec; see `references/SPEC.md` and **`references/ELICITATION.md`**. Before any substantial pool, inspect which design-defining answers are still missing and ask the smallest number of high-impact questions, usually **one per turn**. Do not assume what a group means, what experience the user wants, or how variants are used. Read earlier answers before asking again. Validate readiness with `python scripts/brief_gate.py --spec request.json --max-questions 1`. The latest user request determines whether earlier behavior is preserved, extended or replaced.
 2. **Define rejection criteria only AFTER the brief is sufficiently resolved**: distinguish hard no-go conditions, merely inconvenient dependencies, and soft preferences. Include global budgets (e.g. total new attributes across finalists). Do not invent hard constraints.
@@ -70,7 +96,10 @@ Existing `new`, `replay`, `mutate`, `validate` commands remain available. `batch
 
 ## Files
 
-- `scripts/seed_ideation.py`: seed, plan, reproducible prompt batches, replay/mutate, structural final validation.
+- `scripts/design_audit.py`: staged cross-domain design traceability and honest verification-status audit.
+- `references/DESIGN_WORKFLOW.md`: quick/standard/rigorous design lifecycle and re-entry loops.
+- `references/DELIVERY_CONTRACT.md`: optional project workbook, criterion traceability, handoff schema and CLI.
+- `scripts/seed_ideation.py`: optional seed, plan, reproducible prompt batches, replay/mutate, structural final validation.
 - `scripts/brief_gate.py`: evidence-based missing-requirement audit and high-impact question queue; it does **not** understand semantics on its own.
 - `references/ELICITATION.md`: compact question policy, status provenance, and on-demand domain banks.
 - `scripts/funnel_select.py`: hard-gate evidence presence, duplicate-signature cleanup, multi-stage heuristically diverse selection.

@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 from glyphs import SHAPES
 
-VERSION = '1.4.0'
+VERSION = '1.5.0'
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 DEFAULT_LENGTH = 16
 MAX_SEED_LENGTH = 64
@@ -105,6 +105,12 @@ def validate_spec(spec: dict[str,Any]) -> dict[str,Any]:
         raise ValueError('ideation.require_full_pool must be boolean')
     if ideation.get('pool_size',d.get('items',4)*16)<d.get('items',4):
         raise ValueError('ideation.pool_size cannot be less than final items')
+    profile=spec.get('design',{})
+    if not isinstance(profile,dict): raise ValueError('design must be an object')
+    if profile.get('mode','standard') not in ('quick','standard','rigorous'):
+        raise ValueError('design.mode must be quick, standard or rigorous')
+    if profile.get('strategy','compare') not in ('direct','compare'):
+        raise ValueError('design.strategy must be direct or compare')
     context=spec.get('context',{})
     if not isinstance(context,dict): raise ValueError('context must be an object')
     if not isinstance(spec.get('unknowns',[]),list): raise ValueError('unknowns must be an array')
