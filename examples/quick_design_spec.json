@@ -1,0 +1,6 @@
+{
+ "request":"Design a single accessible information poster layout",
+ "design":{"mode":"quick","strategy":"direct"},
+ "requirements":[{"id":"R1","text":"Readable information hierarchy","level":"must","source":"user"}],
+ "deliverables":{"items":1}
+}

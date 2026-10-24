@@ -1,0 +1,9 @@
+{
+ "brief":{"problem":"A text-heavy poster obscures the main message","users":["Event attendees"],"outcome":"Primary information is immediately legible","success_criteria":[{"id":"S1","criterion":"All key messages readable","method":"Manual visual inspection"}],"scope":{"in":["Single poster layout"]}},
+ "discovery":{"not_needed_reason":"Self-contained supplied text, no external claims or research requested"},
+ "concepts":[{"id":"C1","summary":"High-contrast two-column typographic layout","principle":"Progressive emphasis rather than equal-weight text","tradeoffs":{"benefits":["Fast scanning"],"costs":["Less space for decoration"]},"requirement_checks":{"R1":{"status":"pass","evidence":"Primary headline and details have distinct hierarchy"}}}],
+ "decision":{"selected":["C1"],"rationale":"Only one layout requested; type hierarchy directly addresses problem","authority":"agent_proposal"},
+ "specification":{"artifacts":[{"id":"D1","name":"Poster specification","type":"visual-design","content":"Headline at top; supporting details in two aligned columns; maintain contrast and alignment","requirements":["R1"],"acceptance":[{"id":"AC1","criterion":"All text legible","method":"Visual review"}],"edge_cases":["Long translated labels"]}]},
+ "verification":{"results":[{"acceptance_id":"AC1","status":"not_run","method":"Visual review","issue":"Rendered final composition not provided"}]},
+ "handoff":{"status":"draft","summary":"Poster layout specification, not yet rendered","deliverables":[{"artifact_id":"D1","location":"examples/quick_design_workbook.json#specification"}],"remaining_work":["Render and visually inspect"]}
+}

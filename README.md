@@ -1,12 +1,34 @@
-# Seeded Ideation v1.4 | 需求驱动的大候选池随机创意 Skill
+# Seeded Ideation v1.5 | 通用设计工作流 + 可选随机创意探索
 
-**核心目标：先产生大量简短、真正不同的方案，再淘汰不符合用户需求的内容，从合格者中选出最有价值、互有差异的结果。**
+**核心目标：让 Agent 从设计需求到可交付方案形成可复核的闭环，同时保留可追溯的随机种子创意发散能力。**
 
 该技能适用于游戏、软件、界面、服务、文案等，不预设保守创新或颠覆式创新。用户的本次要求决定边界。随机种子只负责为探索提供可追溯的外部扰动。
 
 ## 安装
 
 解压 `seeded-ideation` 至 Agent 支持的 skills 目录，例如 `%USERPROFILE%\.codex\skills\seeded-ideation\`。Python 3.9+，无第三方依赖。
+
+## 通用设计流程（v1.5）
+
+`需求界定 → 调研/分析 → 方案探索 → 取舍决策 → 详细设计 → 检查/验证/迭代 → 交付`。支持游戏机制、UI、软件架构、服务、视觉、内容与其他设计任务。按任务选 `quick`（轻量）、`standard`（标准）或 `rigorous`（高要求）；如只需一个方案，选 `direct`，需要备选则选 `compare`。
+
+- **设计输入：** 用户目标、实际设计对象、已知背景、硬限制与许可修改的范围；不可凭空补全未知事实。
+- **研究与决策：** 真实证据和假设分开；比较成本、体验、可实现性与风险，不虚构用户批准。
+- **可实施输出：** 交付适用于当前领域的设计工件，并将硬需求关联到可观察的验收条件。
+- **验证闭环：** `pass/fail/blocked/not_run` 显式记录，失败要修订并复测；没有运行的测试不标为通过。
+- **随机性是可选组件：** 只有需要扩大探索空间时才启动 `plan/batch/funnel`，不要求所有设计生成 256 个候选。
+
+```bash
+# 标准模式的完整示例：文档/设计工件可直接作为 workbook 的 content 或 location
+python scripts/design_audit.py --spec examples/general_design_spec.json --workbook examples/general_design_workbook.json --through handoff
+
+# 单方案轻量设计，不需要大候选池或伪造竞品研究
+python scripts/design_audit.py --spec examples/quick_design_spec.json --workbook examples/quick_design_workbook.json --through handoff
+```
+
+`structure_pass=true` 只表示**声明式结构与追踪关系完整**；`verification_status=incomplete` 表示还有未执行的验收，**不能冒充设计通过真实验证**。详见 `references/DESIGN_WORKFLOW.md` 和 `references/DELIVERY_CONTRACT.md`。
+
+## 可选：种子驱动的多候选探索
 
 ## 需求访谈（新）
 
@@ -48,4 +70,4 @@ python scripts/seed_ideation.py validate --spec examples/four_ideas_funnel.json 
 python -m unittest discover -s tests -v
 ```
 
-查看 `SKILL.md`、`references/FUNNEL.md` 与 `references/SPEC.md` 获取算法边界和候选 JSON 格式。
+查看 `SKILL.md`、`references/DESIGN_WORKFLOW.md`、`references/DELIVERY_CONTRACT.md`、`references/FUNNEL.md` 与 `references/SPEC.md` 获取工作流、验证边界和 JSON 格式。

@@ -1,0 +1,11 @@
+{
+  "request": "Redesign an existing software knowledge base's navigation while retaining access to bookmarked pages; compare two substantive approaches and draft an implementable specification.",
+  "context": {"summary": "Current static category tree is difficult for cross-topic queries; no actual user research has been conducted for this illustrative case."},
+  "design": {"mode": "standard", "strategy": "compare"},
+  "requirements": [
+    {"id": "R1", "text": "Previously bookmarked content must remain reachable", "level": "must", "source": "user"},
+    {"id": "R2", "text": "Provide an implementable navigation design", "level": "must", "source": "user"},
+    {"id": "P1", "text": "Prefer discoverable navigation", "level": "prefer", "source": "inferred"}
+  ],
+  "deliverables": {"items": 1}
+}

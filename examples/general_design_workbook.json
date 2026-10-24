@@ -1,0 +1,24 @@
+{
+  "brief": {
+    "problem": "The static tree separates related answers into distant categories.",
+    "users": ["Support staff locating existing documentation"],
+    "outcome": "Users can find content by task without breaking bookmarked URLs.",
+    "success_criteria": [{"id": "S1", "criterion": "Previously bookmarked URLs remain navigable", "method": "Integration test against reference URL set"}],
+    "scope": {"in": ["Navigation structure", "URL preservation"], "out": ["Rewrite article content", "Search ranking algorithm"]},
+    "assumptions": [{"id": "A1", "text": "Task tags exist or can be curated", "status": "unverified", "validation": "Check current content metadata before implementation"}]
+  },
+  "discovery": {
+    "findings": [{"id": "F1", "claim": "The provided baseline uses a static category tree", "source": "user", "evidence": "Current-state description in task brief", "confidence": "high"}],
+    "gaps": ["Current bookmark URL inventory not provided"]
+  },
+  "concepts": [
+    {"id": "C1", "summary": "Task-based facets plus existing canonical article URLs", "principle": "Navigate by tasks and tags rather than strict category hierarchy", "tradeoffs": {"benefits": ["Cross-topic discoverability"], "costs": ["Tag maintenance"]}, "requirement_checks": {"R1": {"status": "pass", "evidence": "Routing preserves original canonical article paths"}, "R2": {"status": "pass", "evidence": "Defines facets, canonical routes and empty/error states"}}},
+    {"id": "C2", "summary": "Role-based landing pages backed by old canonical URLs", "principle": "Navigate first by persona and frequent jobs", "tradeoffs": {"benefits": ["Clear entry points for common roles"], "costs": ["Overlaps across personas"]}, "requirement_checks": {"R1": {"status": "pass", "evidence": "Role indexes point to unchanged URLs"}, "R2": {"status": "pass", "evidence": "Would define role-specific entry flows"}}}
+  ],
+  "decision": {"selected": ["C1"], "rejected": [{"id": "C2", "reason": "Adds persona maintenance and misses some cross-role tasks"}], "rationale": "Facet taxonomy better supports cross-topic questions; url continuity remains intact", "authority": "agent_proposal"},
+  "specification": {
+    "artifacts": [{"id": "D1", "name": "Navigation implementation contract", "type": "software-spec", "content": "Introduce task facets and facet-to-article index; route article links to existing canonical URL; empty facet shows browse-all fallback. Do not modify article identifiers.", "requirements": ["R1", "R2"], "acceptance": [{"id": "AC1", "criterion": "All existing bookmarks resolve to canonical articles", "method": "Automated URL regression test"}, {"id": "AC2", "criterion": "Empty facets offer a clear fallback", "method": "UI state walkthrough"}], "edge_cases": ["Deleted article", "Missing tag", "Empty facet", "Permission-restricted article"]}]
+  },
+  "verification": {"results": [{"acceptance_id": "AC1", "status": "not_run", "method": "Automated URL regression test", "issue": "Reference URL inventory and running application unavailable"}, {"acceptance_id": "AC2", "status": "not_run", "method": "UI state walkthrough", "issue": "No prototype has been implemented"}]},
+  "handoff": {"status": "draft", "summary": "Task facets and canonical route preservation are specified; not implemented or tested", "deliverables": [{"artifact_id": "D1", "location": "examples/general_design_workbook.json#specification"}], "remaining_work": ["Verify tag availability", "Prototype facet navigation", "Run URL regression and UI walkthrough"]}
+}

@@ -1,4 +1,4 @@
-# Request specification (v1.4)
+# Request specification (v1.5; backward-compatible)
 
 The skill accepts a short natural-language request (`--request`) or a JSON spec (`--spec`). A spec is strongly recommended when quantities or multiple constraints matter, but the skill does not require a project-specific contract for ordinary creativity.
 
@@ -82,3 +82,15 @@ A substantial creative search SHOULD add optional `elicitation` data with eviden
 ```
 
 Statuses `confirmed` and `delegated` require evidence of a user/reference response; `inferred` is provisional. An `unknown` high-priority slot needs clarification. Ask one highest-impact question rather than sending a blanket questionnaire. See `references/ELICITATION.md`. Project/domain question banks are optional reusable prompts, not a fixed game contract.
+
+## General design workflow profile (v1.5)
+
+Optional `design` object: `{"mode":"quick|standard|rigorous", "strategy":"direct|compare"}`.
+
+* `quick`: narrow and self-contained, does not require unnecessary research or many alternative directions.
+* `standard`: weigh credible alternatives where appropriate, specify traceable design artifacts, document evaluation.
+* `rigorous`: more evidence and deeper risk / edge-case testing, still no fabricated experiments or approvals.
+* `direct`: one requested design path, no artificial requirement for multiple options.
+* `compare`: meaningful alternatives with documented rejections/choices.
+
+This profile is optional and does not change seed replay, legacy funnel or old structural final validation. `scripts/design_audit.py` validates an optional separate design workbook as described in `references/DELIVERY_CONTRACT.md`.
