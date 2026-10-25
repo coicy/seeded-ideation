@@ -44,7 +44,7 @@ python scripts/brief_gate.py --spec examples/cards_brief_missing.json --max-ques
 # Ask user about the highest-impact unresolved meaning, not all questions.
 # Update facts with grounded answers; create a ready brief, then:
 python scripts/brief_gate.py --spec examples/cards_brief_resolved_example.json --enforce
-python scripts/seed_ideation.py plan --spec examples/cards_brief_resolved_example.json --require-ready --pool-size 256
+python scripts/seed_ideation.py plan --spec examples/cards_brief_resolved_example.json --require-ready --pool-size 320
 ```
 
 The example with resolved answers is *hypothetical* to demonstrate control flow. It is **not** a claim that the real user gave those answers.

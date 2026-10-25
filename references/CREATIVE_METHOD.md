@@ -33,7 +33,7 @@ To evaluate the skill rather than a single output, compare matched runs with (a)
 
 ## 7. Design the funnel, not just the random walk
 
-For a multi-idea request, the seed should diversify a **candidate pool**, not directly choose the final products. Reject non-compliant candidates before scoring. Generate initial sketches cheaply and defer detail. Use the requirement evidence, duplication analysis and cross-candidate diversity to decide which possibilities survive. A large random pool is only useful if proposals are real and evaluators are rigorous; 256 superficial variants are not a meaningful search.
+For a multi-idea request, the seed should diversify a **candidate pool**, not directly choose the final products. Reject non-compliant candidates before scoring. Generate initial sketches cheaply and defer detail. Use the requirement evidence, duplication analysis and cross-candidate diversity to decide which possibilities survive. A seeded divergent pool requires at least 64 independent seed paths and exactly halves the planned population each selection round. A large random pool is only useful if proposals are real and evaluators are rigorous; 256 superficial variants are not a meaningful search.
 
 ## 8. Where this method fits in a complete design job (v1.5)
 

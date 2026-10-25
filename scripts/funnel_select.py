@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 import sys
 from typing import Any
-from seed_ideation import checksum, validate_spec, VERSION, load_plan, fingerprint
+from seed_ideation import checksum, validate_spec, VERSION, load_plan, fingerprint, halving_rounds, MIN_INDEPENDENT_SEEDS
 
 WEIGHTS={'fit':0.40, 'usefulness':0.25, 'feasibility':0.20, 'novelty':0.15}
 
@@ -168,14 +168,19 @@ def funnel(spec:dict[str,Any],data:dict[str,Any],
     validate_spec(spec)
     entries=data.get('items')
     if not isinstance(entries,list):raise ValueError('pool document must contain items array')
-    lineage=audit_seed_lineage(entries,plan) if plan is not None else None
+    # A seeded funnel must prove that a full independent-seed manifest exists.
+    if plan is None:
+        raise ValueError('seeded funnel requires --plan with at least 64 independently generated seeds')
+    lineage=audit_seed_lineage(entries,plan)
     goal=spec.get('deliverables',{}).get('items',4)
-    ideation=spec.get('ideation',{})
-    target_pool=ideation.get('pool_size',min(256,goal*16))
-    if ideation.get('require_full_pool',False) and len(entries)<target_pool:
-        return {'selection_complete':False, 'reason':'incomplete_pool',
-                'observed_pool':len(entries),'required_pool':target_pool,'finalists':[],
-                'seed_lineage':lineage}
+    target_pool=len(plan['paths'])
+    rounds=halving_rounds(target_pool,goal)
+    if len(entries)!=target_pool:
+        return {'tool':'seeded-ideation','version':VERSION,'selection_complete':False,
+                'reason':'incomplete_pool' if len(entries)<target_pool else 'unexpected_extra_candidates',
+                'observed_pool':len(entries),'required_pool':target_pool,
+                'minimum_seed_count':MIN_INDEPENDENT_SEEDS,'seed_lineage':lineage,
+                'halving_rounds':rounds,'stages':[],'finalists':[]}
     required_ids=must_ids(spec)
     rejected=[];eligible=[];seen_id=set()
     for index,item in enumerate(entries):
@@ -193,30 +198,40 @@ def funnel(spec:dict[str,Any],data:dict[str,Any],
             duplicates.append({'id':it['id'],'duplicate_of':signatures[sig]['id'],'signature':sig})
         else:signatures[sig]=it
     survivors=list(signatures.values())
-    # Coarse-to-fine stages; 256 -> 64 -> 16 -> 4 when goal is 4.
+    # Every actual selection round retains exactly half of the planned preceding
+    # population. Hard rejects and deduplication count against the eliminated half
+    # in the first round, not as an unreported extra selection round.
     stages=[];current=survivors
-    sizes=[]
-    for n in (goal*16,goal*4,goal):
-        n=min(n,len(current))
-        if n not in sizes:sizes.append(n)
-    # Sizes must never increase even when a severe rejection reduces the pool.
     positions_needed=spec.get('deliverables',{}).get('min_distinct_positions',0)
     attr_limit=spec.get('deliverables',{}).get('max_new_attributes')
-    for n in sizes:
-        final_stage = n==goal
-        current=(choose_final_beam(current,n,attr_limit=attr_limit,
-                      min_positions=positions_needed) if final_stage else pick(current,n))
-        stages.append({'remaining':len(current),'requested':n,
-                       'ids':[x['id'] for x in current], 'phase':'final' if final_stage else 'shortlist'})
-    finalists=current[:goal]
+    prior_planned=target_pool
+    for round_no,n in enumerate(rounds,1):
+        final_stage=(n==goal)
+        if len(current)<n:
+            stages.append({'round':round_no,'from_planned':prior_planned,
+                           'requested':n,'remaining':len(current),'phase':'incomplete',
+                           'ids':[x['id'] for x in current]})
+            break
+        candidate_selection=(choose_final_beam(current,n,attr_limit=attr_limit,
+                             min_positions=positions_needed) if final_stage else pick(current,n))
+        current=candidate_selection
+        stages.append({'round':round_no,'from_planned':prior_planned,
+                       'requested':n,'remaining':len(current),
+                       'ids':[x['id'] for x in current], 'phase':'final' if final_stage else 'shortlist',
+                       'exact_half':len(current)==n})
+        if len(current)!=n:break
+        prior_planned=n
+    finalists=current[:goal] if len(stages)==len(rounds) and all(st.get('exact_half') for st in stages) else []
     positions=set(x['position'] for x in finalists)
     attrs=set(a for x in finalists for a in x.get('new_attributes',[]))
-    pass_all=(len(finalists)==goal and len(positions)>=positions_needed
+    pass_all=(len(stages)==len(rounds) and all(st.get('exact_half') for st in stages)
+              and len(finalists)==goal and len(positions)>=positions_needed
               and (attr_limit is None or len(attrs)<=attr_limit))
-    reason= 'complete' if pass_all else 'insufficient_eligible_or_diverse_candidates'
+    reason= 'complete' if pass_all else 'insufficient_eligible_for_exact_halving'
     return {'tool':'seeded-ideation','version':VERSION,'spec_fingerprint':checksum(spec),
             'selection_complete':pass_all,'reason':reason,
             'observed_pool':len(entries),'required_pool':target_pool,
+            'minimum_seed_count':MIN_INDEPENDENT_SEEDS,'halving_rounds':rounds,
             'seed_lineage':lineage,'eligible_before_dedup':len(eligible),'rejected':len(rejected),
             'rejection_counts':dict(Counter(reason for row in rejected for reason in row['reasons'])),
             'rejection_samples':rejected[:20],
@@ -234,7 +249,7 @@ def main()->int:
     p.add_argument('--spec',required=True)
     p.add_argument('--candidates',required=True,help='JSON object {"items": [...]}; short idea evaluations')
     p.add_argument('--output',help='optional report path')
-    p.add_argument('--plan',help='v1.6 seed manifest: enforce one seed per candidate path')
+    p.add_argument('--plan',required=True,help='v1.7 seed manifest: 64+ independent seeds and exact halving')
     args=p.parse_args()
     try:
         spec=validate_spec(json.loads(Path(args.spec).read_text(encoding='utf8')))

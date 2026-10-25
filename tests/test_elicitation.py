@@ -38,9 +38,9 @@ class ElicitationTests(unittest.TestCase):
         self.assertIn('clarification required',r.stderr)
 
     def test_plan_allowed_after_brief_confirmed(self):
-        r=call(SEED,'plan','--spec',str(READY),'--require-ready','--pool-size','256')
+        r=call(SEED,'plan','--spec',str(READY),'--require-ready','--pool-size','320')
         self.assertEqual(r.returncode,0,r.stderr)
-        self.assertEqual(json.loads(r.stdout)['planned_initial_candidates'],256)
+        self.assertEqual(json.loads(r.stdout)['planned_initial_candidates'],320)
 
     def test_inferred_critical_is_not_user_confirmation(self):
         spec=json.loads(READY.read_text(encoding='utf8'))
