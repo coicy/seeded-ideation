@@ -1,97 +1,138 @@
-# Seeded Ideation v1.7 | 至少64条独立种子路径 + 逐轮减半 + 通用设计工作流
+# Seeded Ideation
 
-**核心目标：让 Agent 从设计需求到可交付方案形成可复核的闭环，同时保留可追溯的随机种子创意发散能力。**
+> A reusable design workflow for AI agents — from a clear brief to an auditable design, with optional seed-driven exploration.
 
-该技能适用于游戏、软件、界面、服务、文案等，不预设保守创新或颠覆式创新。用户的本次要求决定边界。随机种子只负责为探索提供可追溯的外部扰动。
+[![Tests](https://github.com/coicy/seeded-ideation/actions/workflows/tests.yml/badge.svg)](https://github.com/coicy/seeded-ideation/actions/workflows/tests.yml)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
 
-## 安装
+**Seeded Ideation** 是一个面向 AI Agent 的通用设计 Skill，帮助完成需求界定、方案探索、设计决策、详细规格、验证与交付。它适用于游戏机制、软件功能、用户界面、服务流程和内容创作等设计任务。
 
-解压 `seeded-ideation` 至 Agent 支持的 skills 目录，例如 `%USERPROFILE%\.codex\skills\seeded-ideation\`。Python 3.9+，无第三方依赖。
+需要大量备选方案时，可以启用**独立种子探索**：每个随机种子对应一条独立路径，从至少 64 条路径开始，每轮淘汰一半，直到得到目标数量的方案。只需要直接改进一个设计时，不必运行随机漏斗。
 
-## 通用设计流程（v1.5）
+## 核心特点
 
-`需求界定 → 调研/分析 → 方案探索 → 取舍决策 → 详细设计 → 检查/验证/迭代 → 交付`。支持游戏机制、UI、软件架构、服务、视觉、内容与其他设计任务。按任务选 `quick`（轻量）、`standard`（标准）或 `rigorous`（高要求）；如只需一个方案，选 `direct`，需要备选则选 `compare`。
+- **完整设计流程**：从问题、约束与目标出发，而不是直接生成随机点子。
+- **按需发散**：支持 `quick`、`standard`、`rigorous` 三种工作深度；随机探索是可选分支。
+- **每路径独立种子**：一条路径绑定一个种子；支持保存清单、批次生成与单路径重放。
+- **逐轮筛选**：发散时不少于 64 条路径，并按照预先计算的配额逐轮保留一半。
+- **需求与验证追踪**：区分硬约束、偏好、假设和测试结果，记录候选淘汰原因。
 
-- **设计输入：** 用户目标、实际设计对象、已知背景、硬限制与许可修改的范围；不可凭空补全未知事实。
-- **研究与决策：** 真实证据和假设分开；比较成本、体验、可实现性与风险，不虚构用户批准。
-- **可实施输出：** 交付适用于当前领域的设计工件，并将硬需求关联到可观察的验收条件。
-- **验证闭环：** `pass/fail/blocked/not_run` 显式记录，失败要修订并复测；没有运行的测试不标为通过。
-- **随机性是可选组件：** 只有需要扩大探索空间时才启动 `plan/batch/funnel`；一旦启动，至少64个独立种子，并逐轮淘汰一半。普通直接设计不强制随机化。
+> **能力边界：** Python 脚本生成可追溯的种子、探索提示和结构化审查结果；**实际设计候选需要 Agent 创作和评估**。种子数量不等于已完成的设计数量，结构检查通过也不等于设计质量已得到验证。
 
-```bash
-# 标准模式的完整示例：文档/设计工件可直接作为 workbook 的 content 或 location
-python scripts/design_audit.py --spec examples/general_design_spec.json --workbook examples/general_design_workbook.json --through handoff
+## 适用场景
 
-# 单方案轻量设计，不需要大候选池或伪造竞品研究
-python scripts/design_audit.py --spec examples/quick_design_spec.json --workbook examples/quick_design_workbook.json --through handoff
-```
+| 任务 | 建议方式 |
+| --- | --- |
+| 优化已有 UI、游戏规则或软件功能 | `direct`：分析现状，提出可执行的修改方案 |
+| 比较不同设计思路 | `compare`：明确差异、取舍和验收标准 |
+| 需要大量差异化创意 | 独立种子探索 + 分轮筛选 |
+| 审核设计规格与验收记录 | `design_audit.py` 检查声明式追踪关系 |
 
-`structure_pass=true` 只表示**声明式结构与追踪关系完整**；`verification_status=incomplete` 表示还有未执行的验收，**不能冒充设计通过真实验证**。详见 `references/DESIGN_WORKFLOW.md` 和 `references/DELIVERY_CONTRACT.md`。
+## 快速开始
 
-## 可选：独立随机种子驱动的多候选探索
+### 1. 作为 Codex Skill 使用
 
-**核心不变量：一个种子对应一条探索路径。** 发散任务至少抽取 **64 个独立且不重复的种子**，每个种子必须对应一条真实创意候选。每轮恰好淘汰一半，直到最终目标数；不能对齐时提高起始种子数，例如目标3个方案时使用96个种子，而不是64个。每批32条只是处理批次，种子彼此独立。保存 `plan.json` 才能完整重放。
+Codex 当前支持从 `$HOME/.agents/skills/` 读取用户级 Skill。将此仓库克隆为其中的独立目录（需要 Git）：
 
-| 最终目标 | 默认独立种子 | 逐轮存活 |
-| --- | ---: | --- |
-| 1 | 64 | 32 → 16 → 8 → 4 → 2 → 1 |
-| 3 | 96 | 48 → 24 → 12 → 6 → 3 |
-| 4 | 64 | 32 → 16 → 8 → 4 |
-| 20 | 80 | 40 → 20 |
-
-显式指定更大数量时，必须仍可逐轮精确减半至最终目标，例如 `--pool-size 256`、目标4时为 `256→128→64→32→16→8→4`。如果合规候选不足某轮的应保留数量，选拔失败并报告缺口，不能补造方案。
-
-## 需求访谈（新）
-
-在大规模发散之前核对关键设计信息，不自动假设“4组”等于“四组各5张”，也不把“最多7个新增属性”擅自解释为“禁止新增属性”。
+**macOS / Linux**
 
 ```bash
-python scripts/brief_gate.py --spec examples/cards_brief_missing.json --max-questions 1
+mkdir -p "$HOME/.agents/skills"
+git clone https://github.com/coicy/seeded-ideation.git "$HOME/.agents/skills/seeded-ideation"
 ```
 
-只向用户询问当前最关键的一项；用户回答后再更新 brief。若用户明确委托自行决定，记录该授权再继续。`scripts/brief_gate.py` 仅检查 Agent 提供的事实与来源声明，不具备自主理解用户意图的能力。
+**Windows PowerShell**
 
-## 256 → 4 示例
+```powershell
+New-Item -ItemType Directory -Force "$HOME/.agents/skills" | Out-Null
+git clone https://github.com/coicy/seeded-ideation.git "$HOME/.agents/skills/seeded-ideation"
+```
+
+安装后，在 Codex 中可以明确指定此 Skill，例如：
+
+> 使用 `seeded-ideation` 为我的游戏设计 4 套机制差异明显的资源管理方案。先确认已有规则，保留硬性约束，采用独立种子探索，解释筛选依据，并给出可验证的最终规格。
+
+其他支持 Agent Skills 格式的 Agent，可将仓库放入其对应的 Skills 目录。参见 [Codex Skill 文档](https://developers.openai.com/codex/skills)。
+
+### 2. 直接使用 Python 工具
+
+要求：Python 3.9+，不需要第三方 Python 依赖。
 
 ```bash
-# 独立抽取256个随机种子、建立256条一对一绑定的路径清单和八个批次
-python scripts/seed_ideation.py plan --spec examples/four_ideas_funnel.json --wildness 5 > plan.json
+git clone https://github.com/coicy/seeded-ideation.git
+cd seeded-ideation
 
-# 从 plan.json 中读取该批的32个独立种子，逐一生成可复现的路线
-python scripts/seed_ideation.py batch --plan plan.json --spec examples/four_ideas_funnel.json --start 1 --format json > batch1.json
-# 同样生成 --start 33,65,97,129,161,193,225
+# 生成探索计划，默认至少 64 个独立种子
+python scripts/seed_ideation.py plan \
+  --spec examples/four_ideas_funnel.json > plan.json
 
-# Agent 根据每个 route 生成真实的短构想，逐条审查并记录到 pool.json
-# 硬性条件不合格或未核实的方案计入第一轮淘汰，不能临时降低每轮目标数量
-python scripts/funnel_select.py --spec examples/four_ideas_funnel.json --plan plan.json --candidates pool.json --output selection_report.json
-
-# 逐轮淘汰一半：256→128→64→32→16→8→4，然后扩写四个胜出方案
-python scripts/seed_ideation.py validate --spec examples/four_ideas_funnel.json --candidates final.json
+# 读取清单中第一批种子，为每条路径生成探索提示
+python scripts/seed_ideation.py batch \
+  --spec examples/four_ideas_funnel.json \
+  --plan plan.json --start 1 --format json > batch_001.json
 ```
 
-`plan` 为每条路径生成**一个独立种子**，`batch` 使用该路径自己的种子产生路线，但**不自动撰写 256 个完整方案**。Agent 必须按批次真实创作候选、给出要求逐条核查与证据后才能声称探索了对应数量。筛选脚本会拒绝硬约束失败、未验证或缺少证据的项目，并按声明的机制标签做去重与多样性重排；无法自动证明语义上的真实合规或创新质量。
+这两条命令会生成 **`plan.json`（种子清单与筛选轮次）** 和 **`batch_001.json`（第一批探索提示）**。它们**不会自动写出完整的设计方案**；应由 Agent 为每条路径撰写候选并记录评价，再使用筛选器。
 
-## 单条路径重放与向后兼容
+## 工作方式
+
+```text
+用户目标与约束
+      │
+      ▼
+需求界定 → 资料分析 → 方案设计 → 评估决策 → 详细规格 → 验证交付
+                         │
+                 需要发散时才启用
+                         ▼
+              64+ 个独立随机种子
+                         ▼
+              每个种子对应一条路径
+                         ▼
+                  Agent 创作候选
+                         ▼
+             硬约束核查、去重、评价
+                         ▼
+                 每轮淘汰 50%
+                         ▼
+                  最终设计方案
+```
+
+例如目标是 4 个方案，默认筛选路径为 **64 → 32 → 16 → 8 → 4**。目标是 3 个方案时，使用 **96 → 48 → 24 → 12 → 6 → 3**，以确保每轮精确对半。筛选失败或合规候选不足时，必须报告缺口，而不是虚构补足。
+
+查看或重放某条已有路径：
 
 ```bash
-# 仅重放清单中的第35条路径
-python scripts/seed_ideation.py replay --spec examples/four_ideas_funnel.json --plan plan.json --start 35 --format json
-# 也可用一条具体的种子单独重放；不会额外派生更多路径
-python scripts/seed_ideation.py replay --spec examples/four_ideas_funnel.json --seed K7M2-8QVA-T3XP-H6RD --format json
-# 生成最小64条独立路径（目标4），不能少于64个
-python scripts/seed_ideation.py new --request "设计四种产品概念" --count 64 --format json
+python scripts/seed_ideation.py replay \
+  --spec examples/four_ideas_funnel.json \
+  --plan plan.json --start 35 --format json
 ```
 
-v1.6 是此前的独立种子行为修正：不再接受旧版 `plan --seed` 或 `batch --seed` 约定；旧版单主种子计划需要重新生成，不能将一条旧种子假装成多个独立种子。
+完整的候选数据格式、`funnel_select.py` 操作方法及验证要求见 [筛选规范](references/FUNNEL.md) 和 [Skill 工作流](SKILL.md)。
 
-## 预算与退出规则
+## 文档与项目结构
 
-发散式筛选固定下限64个独立种子，并采用精确对半淘汰；如果预算不允许完成至少64条真实候选，应使用 `direct` 直接设计工作流，而不是伪称已执行完整随机漏斗。筛选必须配合种子清单 `--plan`，且全部预定候选都真实记录。方案数量不足则如实报告，必要时重新开始另一轮完整的探索。
+| 位置 | 用途 |
+| --- | --- |
+| [`SKILL.md`](SKILL.md) | Agent 触发条件与完整执行要求 |
+| [`references/DESIGN_WORKFLOW.md`](references/DESIGN_WORKFLOW.md) | 通用设计流程 |
+| [`references/SPEC.md`](references/SPEC.md) | 需求规格与参数格式 |
+| [`references/FUNNEL.md`](references/FUNNEL.md) | 独立种子、候选筛选与评价规则 |
+| [`references/DELIVERY_CONTRACT.md`](references/DELIVERY_CONTRACT.md) | 设计交付与验收要求 |
+| [`examples/`](examples/) | 可运行的示例需求与设计记录 |
+| [`scripts/`](scripts/) | 规划、批处理、筛选与结构审查工具 |
 
-## 测试
+## 测试与反馈
+
+在仓库根目录运行：
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-查看 `SKILL.md`、`references/DESIGN_WORKFLOW.md`、`references/DELIVERY_CONTRACT.md`、`references/FUNNEL.md` 与 `references/SPEC.md` 获取工作流、验证边界和 JSON 格式。
+自动测试覆盖种子清单、独立路径、重放、逐轮配额和结构审查等**程序行为**；设计创意的实际价值仍需针对任务进行评估。
+
+问题报告和改进建议可通过 [GitHub Issues](https://github.com/coicy/seeded-ideation/issues) 提交。维护者：[@coicy](https://github.com/coicy)。
+
+## 许可证
+
+仓库目前未提供 `LICENSE` 文件。**公开可见不等于已授予开源使用许可**；如需分发、复用或贡献代码，应先由维护者明确许可条款。
