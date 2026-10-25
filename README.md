@@ -1,9 +1,12 @@
 # Seeded Ideation
 
+**简体中文** | [English](README.en.md)
+
 > A reusable design workflow for AI agents — from a clear brief to an auditable design, with optional seed-driven exploration.
 
 [![Tests](https://github.com/coicy/seeded-ideation/actions/workflows/tests.yml/badge.svg)](https://github.com/coicy/seeded-ideation/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **Seeded Ideation** 是一个面向 AI Agent 的通用设计 Skill，帮助完成需求界定、方案探索、设计决策、详细规格、验证与交付。它适用于游戏机制、软件功能、用户界面、服务流程和内容创作等设计任务。
 
@@ -135,4 +138,4 @@ python -m unittest discover -s tests -v
 
 ## 许可证
 
-仓库目前未提供 `LICENSE` 文件。**公开可见不等于已授予开源使用许可**；如需分发、复用或贡献代码，应先由维护者明确许可条款。
+本项目采用 [MIT License](LICENSE)，版权所有 © 2026 [coicy](https://github.com/coicy)。允许商业使用、修改、再分发及私有部署，但在分发软件或其重要部分时必须保留版权和许可声明。软件按“原样”提供，不附带任何担保。
