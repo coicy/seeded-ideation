@@ -113,8 +113,8 @@ class RequestLedSkillTests(unittest.TestCase):
         a=run('new','--spec',spec,'--format','json')
         self.assertEqual(a.returncode,0,a.stderr)
         data=json.loads(a.stdout)
-        self.assertEqual(data['count'],4)
-        self.assertEqual(len({x['seed'] for x in data['candidates']}),4)
+        self.assertEqual(data['count'],64)
+        self.assertEqual(len({x['seed'] for x in data['candidates']}),64)
         seed=data['seeds'][0]['seed']
         self.assertEqual(len(seed),16)
         b=run('mutate','--seed',seed,'--spec',spec,'--edits','2','--format','json')

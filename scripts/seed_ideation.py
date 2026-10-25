@@ -17,7 +17,9 @@ from typing import Any, Optional
 
 from glyphs import SHAPES
 
-VERSION = '1.6.0'
+VERSION = '1.7.0'
+MIN_INDEPENDENT_SEEDS = 64
+MAX_POOL_SIZE = 4096
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 DEFAULT_LENGTH = 16
 MAX_SEED_LENGTH = 64
@@ -70,6 +72,36 @@ def _nonblank(x: Any) -> bool:
     return isinstance(x,str) and bool(x.strip())
 
 
+def minimum_pool_size(final_items:int)->int:
+    """Smallest exact-halving population >=64 with at least one selection round."""
+    if type(final_items) is not int or not 1<=final_items<=200:
+        raise ValueError('final_items must be 1..200')
+    count=final_items*2
+    while count<MIN_INDEPENDENT_SEEDS:
+        count*=2
+    if count>MAX_POOL_SIZE: raise ValueError('final output too large for seed budget')
+    return count
+
+
+def halving_rounds(pool_size:int, final_items:int)->list[int]:
+    """Return exact round quotas, with no arbitrary final trimming."""
+    minimum=minimum_pool_size(final_items)
+    if type(pool_size) is not int or pool_size<minimum or pool_size>MAX_POOL_SIZE:
+        raise ValueError(f'pool_size must be >= {minimum} (at least {MIN_INDEPENDENT_SEEDS} independent seeds) and <= {MAX_POOL_SIZE}')
+    rounds=[];remaining=pool_size
+    while remaining>final_items and remaining%2==0:
+        remaining//=2
+        rounds.append(remaining)
+    if remaining!=final_items:
+        suggestion=minimum
+        while suggestion<pool_size and suggestion<=MAX_POOL_SIZE:
+            suggestion*=2
+        raise ValueError(f'pool_size {pool_size} cannot halve exactly to {final_items} finalists; '
+                         f'use {suggestion} instead' if suggestion<=MAX_POOL_SIZE else
+                         f'pool_size {pool_size} cannot halve exactly to {final_items} finalists within {MAX_POOL_SIZE}')
+    return rounds
+
+
 def validate_spec(spec: dict[str,Any]) -> dict[str,Any]:
     if not isinstance(spec,dict) or not _nonblank(spec.get('request')):
         raise ValueError('spec requires a nonempty request string')
@@ -103,8 +135,8 @@ def validate_spec(spec: dict[str,Any]) -> dict[str,Any]:
             raise ValueError(f'ideation.{k} must be an integer between 1 and 4096')
     if type(ideation.get('require_full_pool',False)) is not bool:
         raise ValueError('ideation.require_full_pool must be boolean')
-    if ideation.get('pool_size',d.get('items',4)*16)<d.get('items',4):
-        raise ValueError('ideation.pool_size cannot be less than final items')
+    if 'pool_size' in ideation:
+        halving_rounds(ideation['pool_size'],d.get('items',4))
     profile=spec.get('design',{})
     if not isinstance(profile,dict): raise ValueError('design must be an object')
     if profile.get('mode','standard') not in ('quick','standard','rigorous'):
@@ -159,7 +191,7 @@ def independent_paths(count:int,length:int=DEFAULT_LENGTH,start:int=1)->list[dic
     manifest to replay a run; independently sampled draws cannot be regenerated
     from a single master string.
     """
-    if type(count) is not int or not 1<=count<=4096:raise ValueError('seed count must be 1..4096')
+    if type(count) is not int or not 1<=count<=MAX_POOL_SIZE:raise ValueError('seed count must be 1..4096')
     if type(start) is not int or start<1 or start+count-1>4096:raise ValueError('path number out of bounds')
     if type(length) is not int or not 4<=length<=MAX_SEED_LENGTH:
         raise ValueError('seed length must be 4..64')
@@ -249,10 +281,9 @@ def make_plan(spec:dict[str,Any],wildness:int=3,
     validate_spec(spec)
     ideation=spec.get('ideation',{})
     final_count=spec.get('deliverables',{}).get('items',4)
-    pool=pool_size if pool_size is not None else ideation.get('pool_size',min(256,final_count*16))
+    pool=pool_size if pool_size is not None else ideation.get('pool_size',minimum_pool_size(final_count))
+    round_quotas=halving_rounds(pool,final_count)
     batch=batch_size if batch_size is not None else ideation.get('batch_size',32)
-    if type(pool) is not int or not final_count<=pool<=4096:
-        raise ValueError('pool_size must be between final item count and 4096')
     if type(batch) is not int or not 1<=batch<=4096:
         raise ValueError('batch_size must be 1..4096')
     if not 1<=wildness<=5:raise ValueError('wildness must be 1..5')
@@ -263,15 +294,17 @@ def make_plan(spec:dict[str,Any],wildness:int=3,
       'spec_fingerprint':sid,'manifest_fingerprint':manifest_fingerprint(sid,paths),
       'final_items':final_count,'planned_initial_candidates':pool,
       'initial_candidates_generated':0,'seed_count':len(paths),'paths':paths,
+      'minimum_seed_count':MIN_INDEPENDENT_SEEDS,'halving_rounds':round_quotas,
+      'round_rule':'exact-half-until-final',
       'batch_size':batch,'wildness':wildness,
-      'require_full_pool':ideation.get('require_full_pool',False),
+      'require_full_pool':True,
       'batches':[{'batch':i+1,'start':start+1,'count':min(batch,pool-start)}
                  for i,start in enumerate(range(0,pool,batch))],
       'selection_stages':[
         'Every path has an independently sampled seed; save this plan JSON before generating batches.',
         'Generate one actual brief concept for every planned seed path; route prompts alone are not concepts.',
         'Semantic hard-rule gate per idea with evidence; reject failures and uncertain claims.',
-        'Deduplicate similar approaches, review novelty, and rank under global constraints.',
+        'Deduplicate similar approaches; each round must hit the scheduled exact-half quota, or stop and report a shortfall.',
         'Expand only the selected finalists; retest full requirements and meaningful differences.'
       ]
     }
@@ -281,7 +314,7 @@ def load_plan(path:str,spec:dict[str,Any])->dict[str,Any]:
     try:plan=json.loads(Path(path).read_text(encoding='utf8'))
     except (OSError,json.JSONDecodeError) as e:raise ValueError(f'invalid plan: {e}') from e
     if not isinstance(plan,dict) or plan.get('seed_model')!='independent-per-path':
-        raise ValueError('legacy single-seed plan unsupported; regenerate a v1.6 multi-seed plan')
+        raise ValueError('legacy plan unsupported; regenerate a v1.7 independent-seed plan')
     if plan.get('version')!=VERSION:raise ValueError('plan version differs; generate a new plan')
     if plan.get('spec_fingerprint')!=checksum(spec):
         raise ValueError('plan spec fingerprint mismatch; use the original request spec')
@@ -290,6 +323,11 @@ def load_plan(path:str,spec:dict[str,Any])->dict[str,Any]:
         raise ValueError('plan paths missing or invalid')
     if len(paths)!=plan.get('seed_count') or len(paths)!=plan.get('planned_initial_candidates'):
         raise ValueError('plan seed count differs from path count')
+    rounds=halving_rounds(len(paths),spec.get('deliverables',{}).get('items',4))
+    if plan.get('halving_rounds')!=rounds or plan.get('round_rule')!='exact-half-until-final' or plan.get('minimum_seed_count')!=MIN_INDEPENDENT_SEEDS:
+        raise ValueError('plan half-elimination schedule mismatch')
+    if plan.get('require_full_pool') is not True:
+        raise ValueError('plan must require a complete seed population')
     seen=set()
     for i,path in enumerate(paths):
         if not isinstance(path,dict) or path.get('number')!=i+1:
@@ -381,7 +419,7 @@ def main(argv:Optional[list[str]]=None)->int:
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('action',nargs='?',default='new',choices=['new','replay','mutate','validate','plan','batch'])
     p.add_argument('--seed',help='one existing seed: replay or mutate ONE path')
-    p.add_argument('--plan',help='immutable v1.6 per-path seed manifest (batch or replay)')
+    p.add_argument('--plan',help='immutable v1.7 per-path seed manifest (batch or replay)')
     p.add_argument('--length',type=int,default=DEFAULT_LENGTH,help='independent seed length (4..64)')
     p.add_argument('--edits',type=int,default=2)
     p.add_argument('--spec',help='JSON file describing this user request')
@@ -390,7 +428,7 @@ def main(argv:Optional[list[str]]=None)->int:
     p.add_argument('--hard',action='append',help='hard constraint (repeatable)')
     p.add_argument('--prefer',action='append',help='preference (repeatable)')
     p.add_argument('--axis',action='append',help='exploration axis (repeatable)')
-    p.add_argument('--count',type=int,default=None,help='new: number of independently drawn seeds')
+    p.add_argument('--count',type=int,default=None,help='new: independent seeds, minimum 64, must halve exactly to final items')
     p.add_argument('--pool-size',type=int,default=None,help='plan: independently drawn path count')
     p.add_argument('--batch-size',type=int,default=None,help='plan: paths per batch')
     p.add_argument('--start',type=int,default=None,help='1-based path number (batch or plan replay)')
@@ -420,9 +458,11 @@ def main(argv:Optional[list[str]]=None)->int:
             print(json.dumps(plan,ensure_ascii=False,indent=2))
             return 0
         if a.action=='new':
-            number=a.count if a.count is not None else spec.get('deliverables',{}).get('items',4)
+            number=a.count if a.count is not None else spec.get('ideation',{}).get('pool_size',minimum_pool_size(spec.get('deliverables',{}).get('items',4)))
+            halving_rounds(number,spec.get('deliverables',{}).get('items',4))
             paths=independent_paths(number,a.length)
             brief=make_brief_from_paths(paths,spec,a.wildness)
+            brief['halving_rounds']=halving_rounds(number,spec.get('deliverables',{}).get('items',4))
         elif a.action=='batch':
             if not a.plan or a.seed:raise ValueError('batch requires --plan plan.json; do not supply --seed')
             if a.start is None or a.start<1:raise ValueError('batch requires --start >= 1')

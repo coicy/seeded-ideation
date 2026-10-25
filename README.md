@@ -1,4 +1,4 @@
-# Seeded Ideation v1.6 | 每路径独立种子 + 通用设计工作流 + 可选随机创意探索
+# Seeded Ideation v1.7 | 至少64条独立种子路径 + 逐轮减半 + 通用设计工作流
 
 **核心目标：让 Agent 从设计需求到可交付方案形成可复核的闭环，同时保留可追溯的随机种子创意发散能力。**
 
@@ -16,7 +16,7 @@
 - **研究与决策：** 真实证据和假设分开；比较成本、体验、可实现性与风险，不虚构用户批准。
 - **可实施输出：** 交付适用于当前领域的设计工件，并将硬需求关联到可观察的验收条件。
 - **验证闭环：** `pass/fail/blocked/not_run` 显式记录，失败要修订并复测；没有运行的测试不标为通过。
-- **随机性是可选组件：** 只有需要扩大探索空间时才启动 `plan/batch/funnel`，不要求所有设计生成 256 个候选。
+- **随机性是可选组件：** 只有需要扩大探索空间时才启动 `plan/batch/funnel`；一旦启动，至少64个独立种子，并逐轮淘汰一半。普通直接设计不强制随机化。
 
 ```bash
 # 标准模式的完整示例：文档/设计工件可直接作为 workbook 的 content 或 location
@@ -30,7 +30,16 @@ python scripts/design_audit.py --spec examples/quick_design_spec.json --workbook
 
 ## 可选：独立随机种子驱动的多候选探索
 
-**核心不变量：一个种子对应一条探索路径。** 规划 256 条路径就独立生成 256 个不同的随机种子；32 条为一批仅用于减少计算开销，不表示一批共享同一个种子。保存 `plan.json` 才能完整重放。
+**核心不变量：一个种子对应一条探索路径。** 发散任务至少抽取 **64 个独立且不重复的种子**，每个种子必须对应一条真实创意候选。每轮恰好淘汰一半，直到最终目标数；不能对齐时提高起始种子数，例如目标3个方案时使用96个种子，而不是64个。每批32条只是处理批次，种子彼此独立。保存 `plan.json` 才能完整重放。
+
+| 最终目标 | 默认独立种子 | 逐轮存活 |
+| --- | ---: | --- |
+| 1 | 64 | 32 → 16 → 8 → 4 → 2 → 1 |
+| 3 | 96 | 48 → 24 → 12 → 6 → 3 |
+| 4 | 64 | 32 → 16 → 8 → 4 |
+| 20 | 80 | 40 → 20 |
+
+显式指定更大数量时，必须仍可逐轮精确减半至最终目标，例如 `--pool-size 256`、目标4时为 `256→128→64→32→16→8→4`。如果合规候选不足某轮的应保留数量，选拔失败并报告缺口，不能补造方案。
 
 ## 需求访谈（新）
 
@@ -53,10 +62,10 @@ python scripts/seed_ideation.py batch --plan plan.json --spec examples/four_idea
 # 同样生成 --start 33,65,97,129,161,193,225
 
 # Agent 根据每个 route 生成真实的短构想，逐条审查并记录到 pool.json
-# 硬性条件不合格或未核实的方案，在此阶段淘汰
+# 硬性条件不合格或未核实的方案计入第一轮淘汰，不能临时降低每轮目标数量
 python scripts/funnel_select.py --spec examples/four_ideas_funnel.json --plan plan.json --candidates pool.json --output selection_report.json
 
-# 将四个胜出方案扩写，附上要求的变体，并复查完整结果
+# 逐轮淘汰一半：256→128→64→32→16→8→4，然后扩写四个胜出方案
 python scripts/seed_ideation.py validate --spec examples/four_ideas_funnel.json --candidates final.json
 ```
 
@@ -69,15 +78,15 @@ python scripts/seed_ideation.py validate --spec examples/four_ideas_funnel.json 
 python scripts/seed_ideation.py replay --spec examples/four_ideas_funnel.json --plan plan.json --start 35 --format json
 # 也可用一条具体的种子单独重放；不会额外派生更多路径
 python scripts/seed_ideation.py replay --spec examples/four_ideas_funnel.json --seed K7M2-8QVA-T3XP-H6RD --format json
-# 快速生成8条路径：8个独立种子，而非1个主种子
-python scripts/seed_ideation.py new --spec examples/four_ideas_funnel.json --count 8 --format json
+# 生成最小64条独立路径（目标4），不能少于64个
+python scripts/seed_ideation.py new --request "设计四种产品概念" --count 64 --format json
 ```
 
-v1.6 是行为修正：不再接受旧版 `plan --seed` 或 `batch --seed` 约定；旧版单主种子计划需要重新生成，不能将一条旧种子假装成多个独立种子。
+v1.6 是此前的独立种子行为修正：不再接受旧版 `plan --seed` 或 `batch --seed` 约定；旧版单主种子计划需要重新生成，不能将一条旧种子假装成多个独立种子。
 
-## 不必永远 256 候选
+## 预算与退出规则
 
-用户需要快速建议时可用较小候选池；复杂创新任务可以加大倍数。候选池大小、批次、分阶段筛选尺度须服从时间与计算预算。如未足量生成，应如实说明而不能把路线数量冒充方案数量。
+发散式筛选固定下限64个独立种子，并采用精确对半淘汰；如果预算不允许完成至少64条真实候选，应使用 `direct` 直接设计工作流，而不是伪称已执行完整随机漏斗。筛选必须配合种子清单 `--plan`，且全部预定候选都真实记录。方案数量不足则如实报告，必要时重新开始另一轮完整的探索。
 
 ## 测试
 

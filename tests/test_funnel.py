@@ -26,6 +26,13 @@ def pool_item(i, position=None, sig=None, attrs=None, status='pass', evidence='m
                       'feasibility':3.6,'novelty':3.5+(i%3)/3}}
 
 
+def attach_lineage(items,plan):
+    for item,path in zip(items,plan['paths']):
+        item['path_number']=path['number']
+        item['seed']=path['seed']
+        item['seed_fingerprint']=path['seed_fingerprint']
+
+
 class FunnelTests(unittest.TestCase):
     def test_plan_256_4_and_8_batches(self):
         r=route('plan','--spec',str(SPEC),'--format','json')
@@ -63,18 +70,21 @@ class FunnelTests(unittest.TestCase):
     def test_256_pool_rejects_fail_uncertain_and_dedups(self):
         sys.path.insert(0,str(ROOT/'scripts'))
         from funnel_select import funnel
+        from seed_ideation import make_plan
         spec=json.loads(SPEC.read_text(encoding='utf8'))
         items=[pool_item(i) for i in range(256)]
         items[0]['requirement_checks']['R1']={'status':'fail','evidence':'contradiction'}
         items[1]['requirement_checks']['R1']={'status':'uncertain','evidence':'cannot verify'}
         items[2]['requirement_checks']['R1']={'status':'pass','evidence':''}
         items[4]['mechanism_signature']=items[3]['mechanism_signature']
-        report=funnel(spec,{'items':items})
+        plan=make_plan(spec)
+        attach_lineage(items,plan)
+        report=funnel(spec,{'items':items},plan=plan)
         self.assertTrue(report['selection_complete'],report)
         self.assertEqual(report['observed_pool'],256)
         self.assertEqual(report['rejected'],3)
         self.assertEqual(report['deduplicated'],1)
-        self.assertEqual([stage['remaining'] for stage in report['stages']],[64,16,4])
+        self.assertEqual([stage['remaining'] for stage in report['stages']],[128,64,32,16,8,4])
         self.assertEqual(len(report['finalists']),4)
         self.assertEqual(report['declared_distinct_positions'],4)
         self.assertTrue(set(row['id'] for row in report['finalists']).isdisjoint({'i000','i001','i002'}))
@@ -82,8 +92,12 @@ class FunnelTests(unittest.TestCase):
     def test_incomplete_pool_is_not_mislabeled_complete(self):
         sys.path.insert(0,str(ROOT/'scripts'))
         from funnel_select import funnel
+        from seed_ideation import make_plan
         spec=json.loads(SPEC.read_text(encoding='utf8'))
-        report=funnel(spec,{'items':[pool_item(i) for i in range(30)]})
+        plan=make_plan(spec)
+        items=[pool_item(i) for i in range(30)]
+        attach_lineage(items,plan)
+        report=funnel(spec,{'items':items},plan=plan)
         self.assertFalse(report['selection_complete'])
         self.assertEqual(report['reason'],'incomplete_pool')
 
@@ -117,9 +131,16 @@ class FunnelTests(unittest.TestCase):
         items=[pool_item(i) for i in range(256)]
         with tempfile.TemporaryDirectory() as d:
             pool=Path(d)/'pool.json'; pool.write_text(json.dumps({'items':items}),encoding='utf8')
+            plan_file=Path(d)/'plan.json'
+            sys.path.insert(0,str(ROOT/'scripts'))
+            from seed_ideation import make_plan
+            plan=make_plan(json.loads(SPEC.read_text(encoding='utf8')))
+            attach_lineage(items,plan)
+            pool.write_text(json.dumps({'items':items}),encoding='utf8')
+            plan_file.write_text(json.dumps(plan),encoding='utf8')
             report=Path(d)/'report.json'
             r=subprocess.run([sys.executable,str(ROOT/'scripts'/'funnel_select.py'),
-                              '--spec',str(SPEC),'--candidates',str(pool),'--output',str(report)],
+                              '--spec',str(SPEC),'--candidates',str(pool),'--plan',str(plan_file),'--output',str(report)],
                              capture_output=True,text=True)
             self.assertEqual(r.returncode,0,r.stderr)
             self.assertTrue(json.loads(report.read_text())['selection_complete'])

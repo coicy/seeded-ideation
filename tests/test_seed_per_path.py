@@ -34,11 +34,11 @@ class IndependentSeedTests(unittest.TestCase):
         self.assertNotEqual(a['number'],b['number'])
 
     def test_plan_is_independently_generated_and_replayable(self):
-        a=cli('plan','--spec',str(SPEC),'--pool-size','40')
-        b=cli('plan','--spec',str(SPEC),'--pool-size','40')
+        a=cli('plan','--spec',str(SPEC),'--pool-size','64')
+        b=cli('plan','--spec',str(SPEC),'--pool-size','64')
         self.assertEqual(a.returncode,0,a.stderr);self.assertEqual(b.returncode,0,b.stderr)
         x=json.loads(a.stdout);y=json.loads(b.stdout)
-        self.assertEqual(len(set(p['seed'] for p in x['paths'])),40)
+        self.assertEqual(len(set(p['seed'] for p in x['paths'])),64)
         self.assertNotEqual([p['seed'] for p in x['paths']],[p['seed'] for p in y['paths']])
         with tempfile.TemporaryDirectory() as d:
             plan=Path(d)/'manifest.json';plan.write_text(a.stdout,encoding='utf8')
@@ -49,7 +49,7 @@ class IndependentSeedTests(unittest.TestCase):
             self.assertEqual(seeds,[p['seed'] for p in x['paths']])
 
     def test_duplicate_and_modified_manifest_fails_closed(self):
-        original=cli('plan','--spec',str(SPEC),'--pool-size','4')
+        original=cli('plan','--spec',str(SPEC),'--pool-size','64')
         self.assertEqual(original.returncode,0,original.stderr)
         with tempfile.TemporaryDirectory() as d:
             plan=Path(d)/'plan.json'
@@ -78,11 +78,11 @@ class SeedFunnelLineageTests(unittest.TestCase):
         from seed_ideation import make_plan
         from funnel_select import audit_seed_lineage
         spec=json.loads(SPEC.read_text(encoding='utf8'))
-        manifest=make_plan(spec,pool_size=4)
+        manifest=make_plan(spec,pool_size=64)
         pool=[{'path_number':p['number'],'seed':p['seed'],
                'seed_fingerprint':p['seed_fingerprint']} for p in manifest['paths']]
         result=audit_seed_lineage(pool,manifest)
-        self.assertEqual(result['candidate_paths'],4)
+        self.assertEqual(result['candidate_paths'],64)
         self.assertFalse(result['semantic_seed_usage_verified'])
         broken=[dict(p) for p in pool]
         broken[1]['path_number']=1
